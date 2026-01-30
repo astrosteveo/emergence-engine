@@ -1,17 +1,52 @@
 {
   "name": "emergence-engine",
-  "version": "0.0.1",
-  "description": "A web-based 2D game engine for simulation games",
+  "version": "0.1.0",
+  "description": "A web-based 2D game engine for simulation games. Code-first, browser-native, minimal by design.",
   "type": "module",
+  "main": "./dist/emergence-engine.js",
+  "module": "./dist/emergence-engine.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/emergence-engine.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src/engine",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:lib": "tsc -p tsconfig.lib.json && vite build --config vite.config.lib.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
+  "keywords": [
+    "game-engine",
+    "2d",
+    "ecs",
+    "entity-component-system",
+    "canvas",
+    "simulation",
+    "typescript",
+    "browser"
+  ],
+  "author": "astrosteveo",
   "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/astrosteveo/emergence-engine"
+  },
+  "bugs": {
+    "url": "https://github.com/astrosteveo/emergence-engine/issues"
+  },
+  "homepage": "https://github.com/astrosteveo/emergence-engine#readme",
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
     "jsdom": "^27.4.0",
