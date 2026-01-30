@@ -2,7 +2,6 @@ export type TickCallback = (dt: number) => void;
 export type DrawCallback = () => void;
 
 export class GameLoop {
-  private tickRate: number;
   private tickDuration: number;
   private accumulator: number = 0;
   private lastTime: number = 0;
@@ -13,7 +12,6 @@ export class GameLoop {
   private drawCallbacks: DrawCallback[] = [];
 
   constructor(tickRate: number = 20) {
-    this.tickRate = tickRate;
     this.tickDuration = 1000 / tickRate;
   }
 
