@@ -23,6 +23,7 @@ npm run test:coverage # Tests with coverage report
 src/
 ├── engine/           # Core engine (importable API)
 │   ├── core/         # GameLoop (fixed timestep)
+│   ├── ecs/          # Entity-Component-System
 │   ├── input/        # Keyboard polling
 │   ├── render/       # Canvas 2D primitives
 │   ├── Engine.ts     # Unified entry point

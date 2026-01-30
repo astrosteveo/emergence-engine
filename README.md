@@ -5,6 +5,7 @@ A web-based 2D game engine for simulation games. Code-first, browser-native, min
 ## Features
 
 - **Game Loop** — Fixed timestep simulation with variable rendering
+- **ECS** — Entity-Component-System with generational IDs
 - **Input System** — Keyboard polling with press/release detection
 - **Renderer** — Canvas 2D drawing primitives
 - **Unified API** — Single `Engine` class ties it all together
@@ -62,6 +63,8 @@ src/
 ├── engine/
 │   ├── core/
 │   │   └── GameLoop.ts    # Fixed timestep loop
+│   ├── ecs/
+│   │   └── World.ts       # Entity-Component-System
 │   ├── input/
 │   │   └── Input.ts       # Keyboard polling
 │   ├── render/
@@ -74,7 +77,7 @@ src/
 ## Roadmap
 
 - [x] Phase 1: Proof of Life — Game loop, input, renderer
-- [ ] Phase 2: ECS Foundation — Entity-Component-System
+- [x] Phase 2: ECS Foundation — Entity-Component-System
 - [ ] Phase 3: World — Chunks, tiles, camera
 - [ ] Phase 4: Pawns — Pathfinding, needs
 - [ ] Phase 5: AI — Utility AI framework
