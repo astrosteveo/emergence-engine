@@ -45,6 +45,8 @@ engine.ecs.defineComponent('PathFollow', { path: [] as PathNode[], nodeIndex: 0 
 engine.ecs.defineComponent('Hunger', { current: 0, max: 100, rate: 2 }); // rate = per second
 engine.ecs.defineComponent('DestinationMarker', {}); // Marker for destination indicator
 engine.ecs.defineComponent('Food', { nutrition: 30 });
+engine.ecs.defineComponent('CurrentTask', { action: '', target: null as Entity | null });
+engine.ecs.defineComponent('AIState', { lastHungerPercent: 0, needsReeval: true });
 
 function spawnFood(count: number): void {
   const halfW = Math.floor(engine.tileMap.width / 2);
@@ -77,6 +79,7 @@ engine.ecs.addComponent(pawn, 'Position', { x: 0, y: 0 });
 engine.ecs.addComponent(pawn, 'Sprite');
 engine.ecs.addComponent(pawn, 'Pawn');
 engine.ecs.addComponent(pawn, 'Hunger', { current: 25, max: 100, rate: 2 });
+engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval: true });
 
 // Destination marker (hidden until path is set)
 let destinationMarker: Entity | null = null;
