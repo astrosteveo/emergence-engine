@@ -29,3 +29,5 @@ export { TileMap } from './world/TileMap';
 export type { TerrainDef, BuildingDef } from './world/TileMap';
 export { generateTerrain } from './world/generate';
 export type { GeneratorConfig } from './world/generate';
+export { Pathfinder } from './ai/Pathfinder';
+export type { PathNode, WalkabilityFn, PathfinderOptions } from './ai/Pathfinder';
