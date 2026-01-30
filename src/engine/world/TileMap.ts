@@ -35,6 +35,18 @@ export class TileMap {
   private nextTerrainId = 1; // 0 reserved for "no terrain"
   private buildingDefs: Map<string, BuildingDef> = new Map();
   private nextBuildingId = 1; // 0 reserved for "no building"
+  private _width = 0;
+  private _height = 0;
+  private terrainData: Uint8Array | null = null;
+  private buildingData: Uint8Array | null = null;
+
+  get width(): number {
+    return this._width;
+  }
+
+  get height(): number {
+    return this._height;
+  }
 
   defineTerrain(name: string, def: Omit<TerrainDef, 'id' | 'name'>): void {
     if (this.terrainDefs.has(name)) {
@@ -64,5 +76,42 @@ export class TileMap {
 
   getBuildingDef(name: string): BuildingDef | undefined {
     return this.buildingDefs.get(name);
+  }
+
+  create(width: number, height: number, defaultTerrain: string): void {
+    const terrainDef = this.terrainDefs.get(defaultTerrain);
+    if (!terrainDef) {
+      throw new Error(`Terrain "${defaultTerrain}" not defined`);
+    }
+
+    this._width = width;
+    this._height = height;
+    this.terrainData = new Uint8Array(width * height);
+    this.buildingData = new Uint8Array(width * height);
+
+    // Fill with default terrain
+    this.terrainData.fill(terrainDef.id);
+  }
+
+  isInBounds(x: number, y: number): boolean {
+    const halfW = Math.floor(this._width / 2);
+    const halfH = Math.floor(this._height / 2);
+    return x >= -halfW && x < this._width - halfW &&
+           y >= -halfH && y < this._height - halfH;
+  }
+
+  private toIndex(x: number, y: number): number {
+    const halfW = Math.floor(this._width / 2);
+    const halfH = Math.floor(this._height / 2);
+    return (y + halfH) * this._width + (x + halfW);
+  }
+
+  getTerrain(x: number, y: number): TerrainDef | undefined {
+    if (!this.terrainData || !this.isInBounds(x, y)) return undefined;
+    const id = this.terrainData[this.toIndex(x, y)];
+    for (const def of this.terrainDefs.values()) {
+      if (def.id === id) return def;
+    }
+    return undefined;
   }
 }

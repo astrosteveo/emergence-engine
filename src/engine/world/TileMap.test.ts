@@ -99,4 +99,60 @@ describe('TileMap', () => {
       expect(tileMap.getBuildingDef('unknown')).toBeUndefined();
     });
   });
+
+  describe('map creation', () => {
+    it('should create map with specified dimensions', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+
+      tileMap.create(64, 64, 'grass');
+
+      expect(tileMap.width).toBe(64);
+      expect(tileMap.height).toBe(64);
+    });
+
+    it('should fill map with default terrain', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+
+      tileMap.create(4, 4, 'grass');
+
+      // Check a few tiles (4x4 map centered: valid range is -2 to 1)
+      expect(tileMap.getTerrain(0, 0)?.name).toBe('grass');
+      expect(tileMap.getTerrain(1, 1)?.name).toBe('grass');
+      expect(tileMap.getTerrain(-2, -2)?.name).toBe('grass'); // Center origin
+    });
+
+    it('should throw when creating with undefined terrain', () => {
+      const tileMap = new TileMap();
+
+      expect(() => tileMap.create(64, 64, 'grass'))
+        .toThrow('Terrain "grass" not defined');
+    });
+
+    it('should report dimensions as 0 before create', () => {
+      const tileMap = new TileMap();
+
+      expect(tileMap.width).toBe(0);
+      expect(tileMap.height).toBe(0);
+    });
+  });
+
+  describe('coordinate system', () => {
+    it('should use center origin (0,0 is center)', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+
+      tileMap.create(4, 4, 'grass'); // -2 to 1 in both axes
+
+      // Valid coordinates
+      expect(tileMap.isInBounds(-2, -2)).toBe(true);
+      expect(tileMap.isInBounds(1, 1)).toBe(true);
+      expect(tileMap.isInBounds(0, 0)).toBe(true);
+
+      // Invalid coordinates
+      expect(tileMap.isInBounds(-3, 0)).toBe(false);
+      expect(tileMap.isInBounds(2, 0)).toBe(false);
+    });
+  });
 });
