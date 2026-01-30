@@ -2,6 +2,11 @@
 
 2D game engine for simulation games. TypeScript + Vite + Canvas 2D.
 
+## Project Docs
+
+- `docs/plans/mvp/design.md` - Architecture vision and roadmap
+- `docs/plans/mvp/plan.md` - Current phase implementation plan
+
 ## Commands
 
 ```bash
@@ -42,3 +47,8 @@ src/
 - Test files excluded from `tsconfig.json` to avoid build errors (Vitest handles its own TS)
 - GameLoop uses fixed timestep (20 ticks/sec default) with variable rendering
 - Input.update() must be called each tick to clear pressed/released state
+
+## Git Workflow
+
+- Branch naming: `feature/phase-N-description`
+- GPL-3.0 license - use `gh repo create --license gpl-3.0`
