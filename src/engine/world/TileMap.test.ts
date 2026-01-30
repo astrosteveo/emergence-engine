@@ -222,4 +222,43 @@ describe('TileMap', () => {
       tileMap.setTerrain(100, 100, 'water');
     });
   });
+
+  describe('walkability', () => {
+    it('should check terrain walkability', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
+      tileMap.create(4, 4, 'grass');
+
+      expect(tileMap.isWalkable(0, 0)).toBe(true);
+
+      tileMap.setTerrain(0, 0, 'water');
+
+      expect(tileMap.isWalkable(0, 0)).toBe(false);
+    });
+
+    it('should check building solidity', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      tileMap.defineBuilding('floor', { color: '#8b7355', solid: false });
+      tileMap.create(4, 4, 'grass');
+
+      expect(tileMap.isWalkable(0, 0)).toBe(true);
+
+      tileMap.setBuilding(0, 0, 'wall');
+      expect(tileMap.isWalkable(0, 0)).toBe(false);
+
+      tileMap.setBuilding(0, 0, 'floor');
+      expect(tileMap.isWalkable(0, 0)).toBe(true);
+    });
+
+    it('should return false for out-of-bounds', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.create(4, 4, 'grass');
+
+      expect(tileMap.isWalkable(100, 100)).toBe(false);
+    });
+  });
 });

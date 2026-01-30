@@ -147,4 +147,14 @@ export class TileMap {
     if (!this.buildingData || !this.isInBounds(x, y)) return;
     this.buildingData[this.toIndex(x, y)] = 0;
   }
+
+  isWalkable(x: number, y: number): boolean {
+    const terrain = this.getTerrain(x, y);
+    if (!terrain || !terrain.walkable) return false;
+
+    const building = this.getBuilding(x, y);
+    if (building && building.solid) return false;
+
+    return true;
+  }
 }
