@@ -17,6 +17,7 @@
  */
 
 import { GameLoop } from './core/GameLoop';
+import { World } from './ecs/World';
 import { Input } from './input/Input';
 import { Renderer } from './render/Renderer';
 
@@ -27,13 +28,20 @@ export interface EngineConfig {
 
 export class Engine {
   readonly loop: GameLoop;
+  readonly ecs: World;
   readonly input: Input;
   readonly renderer: Renderer;
 
   constructor(config: EngineConfig) {
     this.loop = new GameLoop(config.tickRate ?? 20);
+    this.ecs = new World();
     this.input = new Input();
     this.renderer = new Renderer(config.canvas);
+
+    // Run ECS systems each tick
+    this.loop.onTick((dt) => {
+      this.ecs.update(dt);
+    });
 
     // Auto-update input at end of each tick
     this.loop.onTick(() => {

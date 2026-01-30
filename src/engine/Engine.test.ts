@@ -134,4 +134,47 @@ describe('Engine', () => {
     // But isKeyDown should still be true
     expect(engine.input.isKeyDown('KeyA')).toBe(true);
   });
+
+  it('should expose ecs World', () => {
+    const engine = new Engine({ canvas });
+
+    expect(engine.ecs).toBeDefined();
+    expect(typeof engine.ecs.createEntity).toBe('function');
+  });
+
+  it('should auto-run ECS systems each tick', () => {
+    const engine = new Engine({ canvas });
+
+    engine.ecs.defineComponent('Counter', { value: 0 });
+    const entity = engine.ecs.createEntity();
+    engine.ecs.addComponent(entity, 'Counter');
+
+    engine.ecs.addSystem({
+      name: 'Increment',
+      query: ['Counter'],
+      update(entities) {
+        for (const e of entities) {
+          const counter = engine.ecs.getComponent<{ value: number }>(e, 'Counter')!;
+          counter.value++;
+        }
+      },
+    });
+
+    // Simulate ticks
+    let rafCallback: ((time: number) => void) | null = null;
+    vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => {
+      rafCallback = cb;
+      return 1;
+    });
+    vi.stubGlobal('performance', { now: () => 0 });
+
+    engine.start();
+
+    // Advance time enough for two ticks (100ms for 20 ticks/sec)
+    vi.stubGlobal('performance', { now: () => 100 });
+    if (rafCallback) rafCallback(100);
+
+    const counter = engine.ecs.getComponent<{ value: number }>(entity, 'Counter');
+    expect(counter!.value).toBe(2);
+  });
 });
