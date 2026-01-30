@@ -102,4 +102,126 @@ describe('ActionRegistry', () => {
       ]);
     });
   });
+
+  describe('pickBest', () => {
+    it('returns the highest scoring executable action', () => {
+      const registry = new ActionRegistry();
+      const ecs = new World();
+      ecs.defineComponent('Hunger', { current: 70, max: 100 });
+
+      const entity = ecs.createEntity();
+      ecs.addComponent(entity, 'Hunger', { current: 70, max: 100 });
+
+      registry.defineAction('eat', {
+        canExecute: () => true,
+        score: (e, ctx) => {
+          const hunger = ctx.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger')!;
+          return hunger.current / hunger.max;
+        },
+        execute: () => {},
+      });
+
+      registry.defineAction('wander', {
+        canExecute: () => true,
+        score: () => 0.1,
+        execute: () => {},
+      });
+
+      const context: ActionContext = {
+        ecs: {
+          query: (c) => ecs.query(c),
+          getComponent: (e, n) => ecs.getComponent(e, n),
+          hasComponent: (e, n) => ecs.hasComponent(e, n),
+          addComponent: (e, n, d) => ecs.addComponent(e, n, d),
+          removeComponent: (e, n) => ecs.removeComponent(e, n),
+          isAlive: (e) => ecs.isAlive(e),
+        },
+        findNearest: () => null,
+      };
+
+      const best = registry.pickBest(entity, context);
+      expect(best).toBe('eat');
+    });
+
+    it('returns null when no actions can execute', () => {
+      const registry = new ActionRegistry();
+      const ecs = new World();
+      const entity = ecs.createEntity();
+
+      registry.defineAction('eat', {
+        canExecute: () => false,
+        score: () => 0.5,
+        execute: () => {},
+      });
+
+      const context: ActionContext = {
+        ecs: {
+          query: (c) => ecs.query(c),
+          getComponent: (e, n) => ecs.getComponent(e, n),
+          hasComponent: (e, n) => ecs.hasComponent(e, n),
+          addComponent: (e, n, d) => ecs.addComponent(e, n, d),
+          removeComponent: (e, n) => ecs.removeComponent(e, n),
+          isAlive: (e) => ecs.isAlive(e),
+        },
+        findNearest: () => null,
+      };
+
+      const best = registry.pickBest(entity, context);
+      expect(best).toBeNull();
+    });
+  });
+
+  describe('execute', () => {
+    it('calls the action execute method', () => {
+      const registry = new ActionRegistry();
+      const ecs = new World();
+      const entity = ecs.createEntity();
+      let executed = false;
+
+      registry.defineAction('test', {
+        canExecute: () => true,
+        score: () => 0.5,
+        execute: () => {
+          executed = true;
+        },
+      });
+
+      const context: ActionContext = {
+        ecs: {
+          query: (c) => ecs.query(c),
+          getComponent: (e, n) => ecs.getComponent(e, n),
+          hasComponent: (e, n) => ecs.hasComponent(e, n),
+          addComponent: (e, n, d) => ecs.addComponent(e, n, d),
+          removeComponent: (e, n) => ecs.removeComponent(e, n),
+          isAlive: (e) => ecs.isAlive(e),
+        },
+        findNearest: () => null,
+      };
+
+      registry.execute('test', entity, context);
+      expect(executed).toBe(true);
+    });
+
+    it('throws when action does not exist', () => {
+      const registry = new ActionRegistry();
+      const ecs = new World();
+      const entity = ecs.createEntity();
+
+      const context: ActionContext = {
+        ecs: {
+          query: (c) => ecs.query(c),
+          getComponent: (e, n) => ecs.getComponent(e, n),
+          hasComponent: (e, n) => ecs.hasComponent(e, n),
+          addComponent: (e, n, d) => ecs.addComponent(e, n, d),
+          removeComponent: (e, n) => ecs.removeComponent(e, n),
+          isAlive: (e) => ecs.isAlive(e),
+        },
+        findNearest: () => null,
+      };
+
+      expect(() => registry.execute('nonexistent', entity, context)).toThrow(
+        'Action "nonexistent" not defined'
+      );
+    });
+  });
 });

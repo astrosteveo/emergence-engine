@@ -75,4 +75,18 @@ export class ActionRegistry {
 
     return scores;
   }
+
+  pickBest(entity: Entity, context: ActionContext): string | null {
+    const scores = this.evaluateAll(entity, context);
+    const best = scores.find((s) => s.canExecute);
+    return best?.action ?? null;
+  }
+
+  execute(name: string, entity: Entity, context: ActionContext): void {
+    const definition = this.actions.get(name);
+    if (!definition) {
+      throw new Error(`Action "${name}" not defined`);
+    }
+    definition.execute(entity, context);
+  }
 }
