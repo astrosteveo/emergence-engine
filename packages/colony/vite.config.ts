@@ -1,5 +1,5 @@
 /*
- * This file is part of Emergence Engine.
+ * This file is part of Colony.
  * Copyright (C) 2026 astrosteveo
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,18 +17,10 @@
  */
 
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
 
 export default defineConfig({
+  root: '.',
   build: {
-    lib: {
-      entry: resolve(__dirname, 'src/engine/index.ts'),
-      name: 'EmergenceEngine',
-      fileName: 'emergence-engine',
-      formats: ['es'],
-    },
     outDir: 'dist',
-    emptyOutDir: false, // Preserve .d.ts files from tsc
-    sourcemap: true,
   },
 });

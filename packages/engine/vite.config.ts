@@ -16,15 +16,29 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-export { Engine } from './Engine';
-export type { EngineConfig } from './Engine';
-export { GameLoop } from './core/GameLoop';
-export { World } from './ecs/World';
-export type { Entity, System } from './ecs/World';
-export { Input } from './input/Input';
-export { Renderer } from './render/Renderer';
-export { Camera } from './render/Camera';
-export { TileMap } from './world/TileMap';
-export type { TerrainDef, BuildingDef } from './world/TileMap';
-export { generateTerrain } from './world/generate';
-export type { GeneratorConfig } from './world/generate';
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+
+export default defineConfig({
+  build: {
+    lib: {
+      entry: resolve(__dirname, 'src/index.ts'),
+      name: 'EmergenceEngine',
+      fileName: 'emergence-engine',
+      formats: ['es'],
+    },
+    outDir: 'dist',
+    emptyOutDir: false,
+    sourcemap: true,
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/index.ts'],
+    },
+  },
+});

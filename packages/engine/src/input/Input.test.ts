@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Input } from './Input';
 
 describe('Input', () => {
@@ -24,6 +24,10 @@ describe('Input', () => {
 
   beforeEach(() => {
     input = new Input();
+  });
+
+  afterEach(() => {
+    input.destroy();
   });
 
   function pressKey(code: string): void {
@@ -124,5 +128,78 @@ describe('Input', () => {
 
     expect(input.isKeyPressed('KeyA')).toBe(false);
     expect(input.isKeyReleased('KeyB')).toBe(false);
+  });
+
+  describe('Mouse input', () => {
+    function moveMouse(x: number, y: number): void {
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y }));
+    }
+
+    function mouseDown(button: number): void {
+      window.dispatchEvent(new MouseEvent('mousedown', { button }));
+    }
+
+    function mouseUp(button: number): void {
+      window.dispatchEvent(new MouseEvent('mouseup', { button }));
+    }
+
+    it('should track mouse position', () => {
+      moveMouse(100, 200);
+      expect(input.mouseX).toBe(100);
+      expect(input.mouseY).toBe(200);
+    });
+
+    it('should detect mouse button down', () => {
+      expect(input.isMouseDown('left')).toBe(false);
+      mouseDown(0);
+      expect(input.isMouseDown('left')).toBe(true);
+    });
+
+    it('should detect mouse button up', () => {
+      mouseDown(0);
+      expect(input.isMouseDown('left')).toBe(true);
+      mouseUp(0);
+      expect(input.isMouseDown('left')).toBe(false);
+    });
+
+    it('should detect mouse pressed only on first frame', () => {
+      expect(input.isMousePressed('left')).toBe(false);
+      mouseDown(0);
+      expect(input.isMousePressed('left')).toBe(true);
+      input.update();
+      expect(input.isMousePressed('left')).toBe(false);
+      expect(input.isMouseDown('left')).toBe(true);
+    });
+
+    it('should detect mouse released only on release frame', () => {
+      mouseDown(0);
+      input.update();
+      expect(input.isMouseReleased('left')).toBe(false);
+      mouseUp(0);
+      expect(input.isMouseReleased('left')).toBe(true);
+      input.update();
+      expect(input.isMouseReleased('left')).toBe(false);
+    });
+
+    it('should track right and middle mouse buttons', () => {
+      mouseDown(2); // right
+      expect(input.isMouseDown('right')).toBe(true);
+      mouseDown(1); // middle
+      expect(input.isMouseDown('middle')).toBe(true);
+    });
+  });
+
+  describe('cleanup', () => {
+    it('should stop receiving events after destroy', () => {
+      const testInput = new Input();
+      testInput.destroy();
+
+      // Events after destroy should not be tracked
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ' }));
+      expect(testInput.isKeyDown('KeyZ')).toBe(false);
+
+      window.dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      expect(testInput.isMouseDown('left')).toBe(false);
+    });
   });
 });

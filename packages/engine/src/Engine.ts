@@ -42,7 +42,7 @@ export class Engine {
   constructor(config: EngineConfig) {
     this.loop = new GameLoop(config.tickRate ?? 20);
     this.ecs = new World();
-    this.input = new Input();
+    this.input = new Input(config.canvas);
     this.tileMap = new TileMap();
     this.renderer = new Renderer(config.canvas);
 
@@ -58,7 +58,7 @@ export class Engine {
   }
 
   onTick(callback: (dt: number) => void): void {
-    // Insert before the input.update() call
+    // Runs after ECS systems and input.update() - prefer using ECS systems for game logic
     this.loop.onTick(callback);
   }
 

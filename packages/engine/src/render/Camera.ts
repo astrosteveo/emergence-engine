@@ -72,6 +72,11 @@ export class Camera {
     };
   }
 
+  screenToTile(screenX: number, screenY: number, tileSize: number): { x: number; y: number } {
+    const world = this.screenToWorld(screenX, screenY);
+    return this.worldToTile(world.x, world.y, tileSize);
+  }
+
   getVisibleBounds(tileSize: number): { minX: number; minY: number; maxX: number; maxY: number } {
     // Calculate world-space bounds of the viewport
     const halfViewportWorldWidth = this.viewportWidth / this.zoom / 2;

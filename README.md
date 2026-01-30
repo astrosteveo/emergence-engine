@@ -10,10 +10,11 @@ A web-based 2D game engine for simulation games. Code-first, browser-native, min
 
 - **Game Loop** — Fixed timestep simulation (20 ticks/sec) with variable rendering
 - **ECS** — Entity-Component-System with generational entity IDs
-- **Input** — Keyboard polling with press/release/held detection
+- **Input** — Keyboard and mouse polling with press/release/held detection
 - **Camera** — World-to-screen transforms, discrete zoom levels, viewport culling
 - **TileMap** — Terrain and building layers with center-origin coordinates
 - **Terrain Generation** — Simplex noise-based procedural generation
+- **Pathfinding** — A* pathfinding with customizable walkability
 - **Renderer** — Canvas 2D with world-space and screen-space drawing
 
 ## Quick Start
@@ -27,7 +28,7 @@ npm run dev
 ## Usage
 
 ```typescript
-import { Engine, generateTerrain } from './engine';
+import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
@@ -113,9 +114,17 @@ engine.ecs.query(['Position', 'Velocity']);  // Manual queries
 ### Input
 
 ```typescript
+// Keyboard
 engine.input.isKeyDown('ArrowUp');     // Held this tick
 engine.input.isKeyPressed('Space');    // Just pressed this tick
 engine.input.isKeyReleased('Escape');  // Just released this tick
+
+// Mouse
+engine.input.mouseX;                   // Canvas-relative X position
+engine.input.mouseY;                   // Canvas-relative Y position
+engine.input.isMouseDown('left');      // 'left' | 'right' | 'middle'
+engine.input.isMousePressed('left');   // Just clicked this tick
+engine.input.isMouseReleased('left');  // Just released this tick
 ```
 
 ### Camera
@@ -130,7 +139,8 @@ engine.camera.zoom;                    // Current zoom level
 engine.camera.worldToScreen(x, y);     // Convert coordinates
 engine.camera.screenToWorld(x, y);
 engine.camera.worldToTile(x, y, tileSize);
-engine.camera.getVisibleBounds(tileSize);  // For culling
+engine.camera.screenToTile(x, y, tileSize);  // Mouse click to tile
+engine.camera.getVisibleBounds(tileSize);    // For culling
 ```
 
 ### TileMap
@@ -148,6 +158,22 @@ engine.tileMap.isWalkable(x, y);         // Checks terrain + building
 engine.tileMap.isInBounds(x, y);
 
 // Note: (0,0) is map center, not top-left
+```
+
+### Pathfinder
+
+```typescript
+import { Pathfinder } from 'emergence-engine';
+
+// Create with walkability function
+const pathfinder = new Pathfinder((x, y) => engine.tileMap.isWalkable(x, y));
+
+// Find path between tile coordinates
+const path = pathfinder.findPath(fromX, fromY, toX, toY);
+// Returns: PathNode[] | null (null if no path)
+
+// With options
+const pathfinder = new Pathfinder(isWalkable, { maxIterations: 1000 });
 ```
 
 ### Renderer
@@ -179,24 +205,21 @@ engine.renderer.drawTextScreen(text, x, y, { font, color, align });
 ## Architecture
 
 ```
-src/
-├── engine/                 # Core engine (importable API)
-│   ├── core/
-│   │   └── GameLoop.ts     # Fixed timestep loop
-│   ├── ecs/
-│   │   └── World.ts        # Entity-Component-System
-│   ├── input/
-│   │   └── Input.ts        # Keyboard polling
-│   ├── render/
-│   │   ├── Renderer.ts     # Canvas 2D primitives
-│   │   └── Camera.ts       # View transforms
-│   ├── world/
-│   │   ├── TileMap.ts      # Terrain + building layers
-│   │   ├── generate.ts     # Terrain generation
-│   │   └── noise.ts        # Simplex noise
-│   ├── Engine.ts           # Unified entry point
-│   └── index.ts            # Public exports
-└── main.ts                 # Demo application
+packages/
+├── engine/                 # Emergence Engine (npm: emergence-engine)
+│   └── src/
+│       ├── core/           # GameLoop (fixed timestep)
+│       ├── ecs/            # Entity-Component-System
+│       ├── input/          # Keyboard + mouse polling
+│       ├── render/         # Canvas 2D primitives + Camera
+│       ├── world/          # TileMap, terrain generation
+│       ├── ai/             # A* pathfinding
+│       ├── Engine.ts       # Unified entry point
+│       └── index.ts        # Public exports
+│
+└── colony/                 # Colony game (uses engine API)
+    └── src/
+        └── main.ts         # Game entry point
 ```
 
 ## Roadmap
@@ -204,9 +227,9 @@ src/
 - [x] Phase 1: Proof of Life — Game loop, input, renderer
 - [x] Phase 2: ECS Foundation — Entity-Component-System
 - [x] Phase 3: World — TileMap, Camera, terrain generation
-- [ ] Phase 4: Pawns — Pathfinding, needs system
-- [ ] Phase 5: AI — Utility AI framework
-- [ ] Phase 6: Factions — Multiple colonies, trade
+- [x] Phase 4: A Pawn Lives — Click-to-move, pathfinding, hunger
+- [ ] Phase 5: Pawn Thinks — Utility AI, actions, food items
+- [ ] Phase 6: Two Colonies — Factions, regions, trade
 
 ## License
 
