@@ -37,11 +37,18 @@ interface ComponentDefinition<T = unknown> {
   storage: (T | undefined)[];
 }
 
+export interface System {
+  name: string;
+  query: string[];
+  update(entities: Entity[], dt: number): void;
+}
+
 export class World {
   private generations: number[] = [];
   private alive: boolean[] = [];
   private freeList: number[] = [];
   private components = new Map<string, ComponentDefinition>();
+  private systems: System[] = [];
 
   createEntity(): Entity {
     const index = this.freeList.pop() ?? this.generations.length;
@@ -109,6 +116,41 @@ export class World {
     const def = this.components.get(name);
     if (def) {
       def.storage[entityIndex(entity)] = undefined;
+    }
+  }
+
+  query(componentNames: string[]): Entity[] {
+    const result: Entity[] = [];
+    for (let index = 0; index < this.alive.length; index++) {
+      if (!this.alive[index]) continue;
+      const entity = makeEntity(index, this.generations[index]);
+      let hasAll = true;
+      for (const name of componentNames) {
+        if (!this.hasComponent(entity, name)) {
+          hasAll = false;
+          break;
+        }
+      }
+      if (hasAll) result.push(entity);
+    }
+    return result;
+  }
+
+  addSystem(system: System): void {
+    this.systems.push(system);
+  }
+
+  removeSystem(name: string): void {
+    const index = this.systems.findIndex((s) => s.name === name);
+    if (index !== -1) {
+      this.systems.splice(index, 1);
+    }
+  }
+
+  update(dt: number): void {
+    for (const system of this.systems) {
+      const entities = this.query(system.query);
+      system.update(entities, dt);
     }
   }
 }

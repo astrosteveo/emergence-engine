@@ -197,4 +197,166 @@ describe('World', () => {
       expect(world.hasComponent(entity, 'Position')).toBe(false);
     });
   });
+
+  describe('queries', () => {
+    it('should query entities with matching components', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      world.defineComponent('Velocity', { x: 0, y: 0 });
+
+      const e1 = world.createEntity();
+      world.addComponent(e1, 'Position');
+      world.addComponent(e1, 'Velocity');
+
+      const e2 = world.createEntity();
+      world.addComponent(e2, 'Position');
+
+      const e3 = world.createEntity();
+      world.addComponent(e3, 'Velocity');
+
+      const withBoth = world.query(['Position', 'Velocity']);
+      const withPos = world.query(['Position']);
+      const withVel = world.query(['Velocity']);
+
+      expect(withBoth).toEqual([e1]);
+      expect(withPos).toContain(e1);
+      expect(withPos).toContain(e2);
+      expect(withPos).toHaveLength(2);
+      expect(withVel).toContain(e1);
+      expect(withVel).toContain(e3);
+      expect(withVel).toHaveLength(2);
+    });
+
+    it('should return empty array when no entities match', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+
+      const result = world.query(['Position']);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should exclude dead entities from queries', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+
+      const e1 = world.createEntity();
+      world.addComponent(e1, 'Position');
+      world.destroyEntity(e1);
+
+      const result = world.query(['Position']);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('systems', () => {
+    it('should run systems in registration order', () => {
+      const world = new World();
+      world.defineComponent('Counter', { value: 0 });
+      const entity = world.createEntity();
+      world.addComponent(entity, 'Counter');
+
+      const order: string[] = [];
+
+      world.addSystem({
+        name: 'First',
+        query: ['Counter'],
+        update() {
+          order.push('first');
+        },
+      });
+
+      world.addSystem({
+        name: 'Second',
+        query: ['Counter'],
+        update() {
+          order.push('second');
+        },
+      });
+
+      world.update(0.016);
+
+      expect(order).toEqual(['first', 'second']);
+    });
+
+    it('should pass matching entities and dt to systems', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      world.defineComponent('Velocity', { x: 1, y: 1 });
+
+      const e1 = world.createEntity();
+      world.addComponent(e1, 'Position');
+      world.addComponent(e1, 'Velocity');
+
+      const e2 = world.createEntity();
+      world.addComponent(e2, 'Position');
+
+      let receivedEntities: number[] = [];
+      let receivedDt = 0;
+
+      world.addSystem({
+        name: 'Movement',
+        query: ['Position', 'Velocity'],
+        update(entities, dt) {
+          receivedEntities = entities;
+          receivedDt = dt;
+        },
+      });
+
+      world.update(0.05);
+
+      expect(receivedEntities).toEqual([e1]);
+      expect(receivedDt).toBe(0.05);
+    });
+
+    it('should remove systems by name', () => {
+      const world = new World();
+      world.defineComponent('Counter', { value: 0 });
+      const entity = world.createEntity();
+      world.addComponent(entity, 'Counter');
+
+      let called = false;
+      world.addSystem({
+        name: 'Test',
+        query: ['Counter'],
+        update() {
+          called = true;
+        },
+      });
+
+      world.removeSystem('Test');
+      world.update(0.016);
+
+      expect(called).toBe(false);
+    });
+
+    it('should allow systems to modify components', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      world.defineComponent('Velocity', { x: 10, y: 5 });
+
+      const entity = world.createEntity();
+      world.addComponent(entity, 'Position', { x: 0, y: 0 });
+      world.addComponent(entity, 'Velocity', { x: 10, y: 5 });
+
+      world.addSystem({
+        name: 'Movement',
+        query: ['Position', 'Velocity'],
+        update(entities, dt) {
+          for (const e of entities) {
+            const pos = world.getComponent<{ x: number; y: number }>(e, 'Position')!;
+            const vel = world.getComponent<{ x: number; y: number }>(e, 'Velocity')!;
+            pos.x += vel.x * dt;
+            pos.y += vel.y * dt;
+          }
+        },
+      });
+
+      world.update(1); // 1 second
+
+      const pos = world.getComponent<{ x: number; y: number }>(entity, 'Position');
+      expect(pos).toEqual({ x: 10, y: 5 });
+    });
+  });
 });
