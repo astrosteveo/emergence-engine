@@ -84,7 +84,8 @@ engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval:
 // Destination marker (hidden until path is set)
 let destinationMarker: Entity | null = null;
 
-function createActionContext(): ActionContext {
+// Used by AIDecisionSystem (Task 12)
+export function createActionContext(): ActionContext {
   return {
     ecs: {
       query: (c) => engine.ecs.query(c),
@@ -130,6 +131,56 @@ engine.ai.defineAction('eat', {
       context.ecs.removeComponent(entity, 'CurrentTask');
     }
     context.ecs.addComponent(entity, 'CurrentTask', { action: 'eat', target: food });
+  },
+});
+
+engine.ai.defineAction('wander', {
+  canExecute() {
+    return true;
+  },
+  score() {
+    return 0.1;
+  },
+  execute(entity, context) {
+    const pos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!pos) return;
+
+    const currentTileX = Math.floor(pos.x / TILE_SIZE);
+    const currentTileY = Math.floor(pos.y / TILE_SIZE);
+
+    const range = 5;
+    let targetX = currentTileX;
+    let targetY = currentTileY;
+    let found = false;
+
+    for (let attempts = 0; attempts < 10 && !found; attempts++) {
+      const dx = Math.floor(Math.random() * (range * 2 + 1)) - range;
+      const dy = Math.floor(Math.random() * (range * 2 + 1)) - range;
+      const tx = currentTileX + dx;
+      const ty = currentTileY + dy;
+
+      if (engine.tileMap.isWalkable(tx, ty)) {
+        targetX = tx;
+        targetY = ty;
+        found = true;
+      }
+    }
+
+    if (!found) return;
+
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+
+    context.ecs.addComponent(entity, 'PathTarget', { x: targetX, y: targetY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'wander', target: null });
   },
 });
 
