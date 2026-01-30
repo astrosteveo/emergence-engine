@@ -22,6 +22,7 @@ export { GameLoop } from './core/GameLoop';
 export { World } from './ecs/World';
 export type { Entity, System } from './ecs/World';
 export { Input } from './input/Input';
+export type { MouseButton } from './input/Input';
 export { Renderer } from './render/Renderer';
 export { Camera } from './render/Camera';
 export { TileMap } from './world/TileMap';

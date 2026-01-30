@@ -16,14 +16,26 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+export type MouseButton = 'left' | 'right' | 'middle';
+
 export class Input {
   private keysDown: Set<string> = new Set();
   private keysPressed: Set<string> = new Set();
   private keysReleased: Set<string> = new Set();
 
+  // Mouse state
+  mouseX = 0;
+  mouseY = 0;
+  private mouseButtonsDown: Set<MouseButton> = new Set();
+  private mouseButtonsPressed: Set<MouseButton> = new Set();
+  private mouseButtonsReleased: Set<MouseButton> = new Set();
+
   constructor() {
     window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     window.addEventListener('keyup', (e) => this.handleKeyUp(e));
+    window.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+    window.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+    window.addEventListener('mouseup', (e) => this.handleMouseUp(e));
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -38,10 +50,37 @@ export class Input {
     this.keysReleased.add(e.code);
   }
 
+  private handleMouseMove(e: MouseEvent): void {
+    this.mouseX = e.clientX;
+    this.mouseY = e.clientY;
+  }
+
+  private buttonFromEvent(e: MouseEvent): MouseButton {
+    if (e.button === 2) return 'right';
+    if (e.button === 1) return 'middle';
+    return 'left';
+  }
+
+  private handleMouseDown(e: MouseEvent): void {
+    const button = this.buttonFromEvent(e);
+    if (!this.mouseButtonsDown.has(button)) {
+      this.mouseButtonsPressed.add(button);
+    }
+    this.mouseButtonsDown.add(button);
+  }
+
+  private handleMouseUp(e: MouseEvent): void {
+    const button = this.buttonFromEvent(e);
+    this.mouseButtonsDown.delete(button);
+    this.mouseButtonsReleased.add(button);
+  }
+
   /** Call at end of each tick to clear per-frame state */
   update(): void {
     this.keysPressed.clear();
     this.keysReleased.clear();
+    this.mouseButtonsPressed.clear();
+    this.mouseButtonsReleased.clear();
   }
 
   /** True if key is currently held down */
@@ -57,5 +96,20 @@ export class Input {
   /** True only on the tick the key was released */
   isKeyReleased(code: string): boolean {
     return this.keysReleased.has(code);
+  }
+
+  /** True if mouse button is currently held down */
+  isMouseDown(button: MouseButton): boolean {
+    return this.mouseButtonsDown.has(button);
+  }
+
+  /** True only on the tick the mouse button was first pressed */
+  isMousePressed(button: MouseButton): boolean {
+    return this.mouseButtonsPressed.has(button);
+  }
+
+  /** True only on the tick the mouse button was released */
+  isMouseReleased(button: MouseButton): boolean {
+    return this.mouseButtonsReleased.has(button);
   }
 }
