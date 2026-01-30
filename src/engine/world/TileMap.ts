@@ -114,4 +114,37 @@ export class TileMap {
     }
     return undefined;
   }
+
+  setTerrain(x: number, y: number, name: string): void {
+    if (!this.terrainData || !this.isInBounds(x, y)) return;
+    const def = this.terrainDefs.get(name);
+    if (!def) {
+      throw new Error(`Terrain "${name}" not defined`);
+    }
+    this.terrainData[this.toIndex(x, y)] = def.id;
+  }
+
+  getBuilding(x: number, y: number): BuildingDef | undefined {
+    if (!this.buildingData || !this.isInBounds(x, y)) return undefined;
+    const id = this.buildingData[this.toIndex(x, y)];
+    if (id === 0) return undefined; // No building
+    for (const def of this.buildingDefs.values()) {
+      if (def.id === id) return def;
+    }
+    return undefined;
+  }
+
+  setBuilding(x: number, y: number, name: string): void {
+    if (!this.buildingData || !this.isInBounds(x, y)) return;
+    const def = this.buildingDefs.get(name);
+    if (!def) {
+      throw new Error(`Building "${name}" not defined`);
+    }
+    this.buildingData[this.toIndex(x, y)] = def.id;
+  }
+
+  clearBuilding(x: number, y: number): void {
+    if (!this.buildingData || !this.isInBounds(x, y)) return;
+    this.buildingData[this.toIndex(x, y)] = 0;
+  }
 }

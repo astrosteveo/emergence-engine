@@ -155,4 +155,71 @@ describe('TileMap', () => {
       expect(tileMap.isInBounds(2, 0)).toBe(false);
     });
   });
+
+  describe('tile access', () => {
+    it('should set and get terrain', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
+      tileMap.create(4, 4, 'grass');
+
+      tileMap.setTerrain(0, 0, 'water');
+
+      expect(tileMap.getTerrain(0, 0)?.name).toBe('water');
+      expect(tileMap.getTerrain(1, 0)?.name).toBe('grass'); // Others unchanged
+    });
+
+    it('should set and get buildings', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      tileMap.create(4, 4, 'grass');
+
+      expect(tileMap.getBuilding(0, 0)).toBeUndefined();
+
+      tileMap.setBuilding(0, 0, 'wall');
+
+      expect(tileMap.getBuilding(0, 0)?.name).toBe('wall');
+    });
+
+    it('should clear buildings', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      tileMap.create(4, 4, 'grass');
+
+      tileMap.setBuilding(0, 0, 'wall');
+      tileMap.clearBuilding(0, 0);
+
+      expect(tileMap.getBuilding(0, 0)).toBeUndefined();
+    });
+
+    it('should throw when setting undefined terrain', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.create(4, 4, 'grass');
+
+      expect(() => tileMap.setTerrain(0, 0, 'lava'))
+        .toThrow('Terrain "lava" not defined');
+    });
+
+    it('should throw when setting undefined building', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.create(4, 4, 'grass');
+
+      expect(() => tileMap.setBuilding(0, 0, 'castle'))
+        .toThrow('Building "castle" not defined');
+    });
+
+    it('should ignore out-of-bounds set operations', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
+      tileMap.create(4, 4, 'grass');
+
+      // Should not throw
+      tileMap.setTerrain(100, 100, 'water');
+    });
+  });
 });
