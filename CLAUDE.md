@@ -6,6 +6,7 @@
 
 - `docs/plans/mvp/design.md` - Architecture vision and roadmap
 - `docs/plans/mvp/plan.md` - Current phase implementation plan
+- `docs/plans/phase-2-ecs/design.md` - ECS architecture decisions
 
 ## Commands
 
@@ -48,6 +49,8 @@ src/
 - Test files excluded from `tsconfig.json` to avoid build errors (Vitest handles its own TS)
 - GameLoop uses fixed timestep (20 ticks/sec default) with variable rendering
 - Input.update() must be called each tick to clear pressed/released state
+- ECS systems run before `input.update()` - use systems for game logic, not `engine.onTick()`
+- Entity IDs use generational indices (20-bit index + 12-bit generation) for stale reference detection
 
 ## Git Workflow
 
