@@ -31,6 +31,7 @@ engine.tileMap.defineTerrain('stone', { color: '#6c757d', walkable: true });
 
 // Generate 64x64 world
 generateTerrain(engine.tileMap, { width: 64, height: 64, seed: Date.now() });
+spawnFood(20);
 
 // Create pathfinder using TileMap walkability
 const pathfinder = new Pathfinder((x, y) => engine.tileMap.isWalkable(x, y));
@@ -43,6 +44,32 @@ engine.ecs.defineComponent('PathTarget', { x: 0, y: 0 }); // Target tile
 engine.ecs.defineComponent('PathFollow', { path: [] as PathNode[], nodeIndex: 0 });
 engine.ecs.defineComponent('Hunger', { current: 0, max: 100, rate: 2 }); // rate = per second
 engine.ecs.defineComponent('DestinationMarker', {}); // Marker for destination indicator
+engine.ecs.defineComponent('Food', { nutrition: 30 });
+
+function spawnFood(count: number): void {
+  const halfW = Math.floor(engine.tileMap.width / 2);
+  const halfH = Math.floor(engine.tileMap.height / 2);
+  let spawned = 0;
+  let attempts = 0;
+  const maxAttempts = count * 10;
+
+  while (spawned < count && attempts < maxAttempts) {
+    attempts++;
+    const tileX = Math.floor(Math.random() * engine.tileMap.width) - halfW;
+    const tileY = Math.floor(Math.random() * engine.tileMap.height) - halfH;
+
+    if (engine.tileMap.isWalkable(tileX, tileY)) {
+      const food = engine.ecs.createEntity();
+      engine.ecs.addComponent(food, 'Position', {
+        x: tileX * TILE_SIZE + TILE_SIZE / 2,
+        y: tileY * TILE_SIZE + TILE_SIZE / 2,
+      });
+      engine.ecs.addComponent(food, 'Food', { nutrition: 30 });
+      engine.ecs.addComponent(food, 'Sprite', { width: 12, height: 12, color: '#4ade80' });
+      spawned++;
+    }
+  }
+}
 
 // Create pawn entity at world center
 const pawn = engine.ecs.createEntity();
