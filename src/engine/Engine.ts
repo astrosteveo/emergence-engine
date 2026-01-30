@@ -20,6 +20,8 @@ import { GameLoop } from './core/GameLoop';
 import { World } from './ecs/World';
 import { Input } from './input/Input';
 import { Renderer } from './render/Renderer';
+import { Camera } from './render/Camera';
+import { TileMap } from './world/TileMap';
 
 export interface EngineConfig {
   canvas: HTMLCanvasElement;
@@ -31,11 +33,17 @@ export class Engine {
   readonly ecs: World;
   readonly input: Input;
   readonly renderer: Renderer;
+  readonly tileMap: TileMap;
+
+  get camera(): Camera {
+    return this.renderer.camera;
+  }
 
   constructor(config: EngineConfig) {
     this.loop = new GameLoop(config.tickRate ?? 20);
     this.ecs = new World();
     this.input = new Input();
+    this.tileMap = new TileMap();
     this.renderer = new Renderer(config.canvas);
 
     // Run ECS systems each tick

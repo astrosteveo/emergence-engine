@@ -18,6 +18,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Engine } from './Engine';
+import { TileMap } from './world/TileMap';
+import { Camera } from './render/Camera';
 
 describe('Engine', () => {
   let canvas: HTMLCanvasElement;
@@ -176,5 +178,18 @@ describe('Engine', () => {
 
     const counter = engine.ecs.getComponent<{ value: number }>(entity, 'Counter');
     expect(counter!.value).toBe(2);
+  });
+
+  it('should expose tileMap', () => {
+    const engine = new Engine({ canvas });
+
+    expect(engine.tileMap).toBeInstanceOf(TileMap);
+  });
+
+  it('should expose camera via renderer', () => {
+    const engine = new Engine({ canvas });
+
+    expect(engine.camera).toBeInstanceOf(Camera);
+    expect(engine.camera).toBe(engine.renderer.camera);
   });
 });
