@@ -94,7 +94,7 @@ export class World {
       throw new Error(`Component "${name}" not defined`);
     }
     const index = entityIndex(entity);
-    const component = { ...def.defaults, ...data } as T;
+    const component = { ...(def.defaults as object), ...data } as T;
     def.storage[index] = component;
     return component;
   }
