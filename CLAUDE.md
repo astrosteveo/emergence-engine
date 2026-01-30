@@ -14,7 +14,7 @@ Monorepo containing:
 
 ## Current Status
 
-Phases 1-3 complete. Engine provides: GameLoop, ECS, Input, Camera, TileMap, Terrain Generation, Renderer.
+Phases 1-4 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding.
 
 ## Commands
 
@@ -45,9 +45,10 @@ packages/
 │   ├── src/
 │   │   ├── core/           # GameLoop (fixed timestep)
 │   │   ├── ecs/            # Entity-Component-System
-│   │   ├── input/          # Keyboard polling (mouse coming Phase 4)
+│   │   ├── input/          # Keyboard + mouse polling
 │   │   ├── render/         # Canvas 2D primitives + Camera
 │   │   ├── world/          # TileMap, terrain generation, noise
+│   │   ├── ai/             # A* pathfinding
 │   │   ├── Engine.ts       # Unified entry point
 │   │   └── index.ts        # Public exports
 │   └── package.json
@@ -80,21 +81,24 @@ packages/
 - Entity IDs use generational indices (20-bit index + 12-bit generation) for stale reference detection
 - Camera uses discrete zoom levels (1x, 2x, 4x) - use `zoomIn()`/`zoomOut()` not arbitrary values
 - TileMap uses center-origin coordinates - (0,0) is map center, not top-left
+- Mouse coordinates are canvas-relative (Input takes canvas element for offset calculation)
 
 ## Public API
 
 All public exports are in `packages/engine/src/index.ts`. Colony (and external consumers) import from `'emergence-engine'`:
 
 ```typescript
-import { Engine, generateTerrain } from 'emergence-engine';
-import type { Entity, System, EngineConfig } from 'emergence-engine';
+import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
+import type { Entity, System, EngineConfig, PathNode } from 'emergence-engine';
 ```
 
 Key exports:
 - `Engine` - Main entry point (creates ECS, Input, Renderer, TileMap, Camera)
 - `generateTerrain` - Procedural terrain generation
+- `Pathfinder` - A* pathfinding with walkability callback
 - `World`, `Entity`, `System` - ECS primitives (also accessible via `engine.ecs`)
 - `Camera`, `Renderer`, `TileMap` - Subsystems (also accessible via engine instance)
+- `MouseButton`, `PathNode` - Type exports
 
 ## Git Workflow
 
