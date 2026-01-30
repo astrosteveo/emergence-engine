@@ -200,28 +200,47 @@ engine.ecs.addSystem({
   },
 });
 
-// Click-to-move system: on left click, set PathTarget on pawn
+// AI Decision system: re-evaluate when needed
 engine.ecs.addSystem({
-  name: 'ClickToMove',
-  query: ['Pawn', 'Position'],
+  name: 'AIDecision',
+  query: ['Pawn', 'Hunger', 'AIState'],
   update(entities) {
-    if (!engine.input.isMousePressed('left')) return;
-
-    const tile = engine.camera.screenToTile(engine.input.mouseX, engine.input.mouseY, TILE_SIZE);
-
-    // Only set target if tile is walkable
-    if (!engine.tileMap.isWalkable(tile.x, tile.y)) return;
+    const context = createActionContext();
 
     for (const e of entities) {
-      // Remove any existing path
-      if (engine.ecs.hasComponent(e, 'PathFollow')) {
-        engine.ecs.removeComponent(e, 'PathFollow');
+      const aiState = engine.ecs.getComponent<{ lastHungerPercent: number; needsReeval: boolean }>(e, 'AIState')!;
+      const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger')!;
+      const currentPercent = hunger.current / hunger.max;
+
+      if (aiState.lastHungerPercent < 0.5 && currentPercent >= 0.5) {
+        aiState.needsReeval = true;
       }
-      // Set new target
-      if (engine.ecs.hasComponent(e, 'PathTarget')) {
-        engine.ecs.removeComponent(e, 'PathTarget');
+      aiState.lastHungerPercent = currentPercent;
+
+      const hasTask = engine.ecs.hasComponent(e, 'CurrentTask');
+      const hasPath = engine.ecs.hasComponent(e, 'PathFollow') || engine.ecs.hasComponent(e, 'PathTarget');
+      if (hasTask && !hasPath) {
+        aiState.needsReeval = true;
       }
-      engine.ecs.addComponent(e, 'PathTarget', { x: tile.x, y: tile.y });
+
+      if (!hasTask) {
+        aiState.needsReeval = true;
+      }
+
+      if (hasTask) {
+        const task = engine.ecs.getComponent<{ action: string; target: Entity | null }>(e, 'CurrentTask')!;
+        if (task.target !== null && !engine.ecs.isAlive(task.target)) {
+          aiState.needsReeval = true;
+        }
+      }
+
+      if (aiState.needsReeval) {
+        aiState.needsReeval = false;
+        const actionName = engine.ai.pickBest(e, context);
+        if (actionName) {
+          engine.ai.execute(actionName, e, context);
+        }
+      }
     }
   },
 });
