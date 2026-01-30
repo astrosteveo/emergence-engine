@@ -18,10 +18,12 @@
 
 import { GameLoop } from './core/GameLoop';
 import { World } from './ecs/World';
+import type { Entity } from './ecs/World';
 import { Input } from './input/Input';
 import { Renderer } from './render/Renderer';
 import { Camera } from './render/Camera';
 import { TileMap } from './world/TileMap';
+import { ActionRegistry } from './ai/ActionRegistry';
 
 export interface EngineConfig {
   canvas: HTMLCanvasElement;
@@ -34,6 +36,7 @@ export class Engine {
   readonly input: Input;
   readonly renderer: Renderer;
   readonly tileMap: TileMap;
+  readonly ai: ActionRegistry;
 
   get camera(): Camera {
     return this.renderer.camera;
@@ -44,6 +47,7 @@ export class Engine {
     this.ecs = new World();
     this.input = new Input(config.canvas);
     this.tileMap = new TileMap();
+    this.ai = new ActionRegistry();
     this.renderer = new Renderer(config.canvas);
 
     // Run ECS systems each tick
@@ -76,5 +80,28 @@ export class Engine {
 
   setSpeed(speed: number): void {
     this.loop.setSpeed(speed);
+  }
+
+  findNearest(entity: Entity, componentName: string): Entity | null {
+    const pos = this.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!pos) return null;
+
+    const candidates = this.ecs.query(['Position', componentName]);
+    let nearest: Entity | null = null;
+    let nearestDist = Infinity;
+
+    for (const candidate of candidates) {
+      if (candidate === entity) continue;
+      const candidatePos = this.ecs.getComponent<{ x: number; y: number }>(candidate, 'Position')!;
+      const dx = candidatePos.x - pos.x;
+      const dy = candidatePos.y - pos.y;
+      const dist = dx * dx + dy * dy;
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = candidate;
+      }
+    }
+
+    return nearest;
   }
 }

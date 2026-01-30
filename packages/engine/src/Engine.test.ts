@@ -192,4 +192,61 @@ describe('Engine', () => {
     expect(engine.camera).toBeInstanceOf(Camera);
     expect(engine.camera).toBe(engine.renderer.camera);
   });
+
+  it('exposes ai property with ActionRegistry', () => {
+    const engine = new Engine({ canvas });
+
+    expect(engine.ai).toBeDefined();
+    expect(typeof engine.ai.defineAction).toBe('function');
+    expect(typeof engine.ai.pickBest).toBe('function');
+  });
+
+  describe('findNearest', () => {
+    it('finds the nearest entity with a component', () => {
+      const engine = new Engine({ canvas });
+      engine.ecs.defineComponent('Position', { x: 0, y: 0 });
+      engine.ecs.defineComponent('Food', { nutrition: 30 });
+
+      const pawn = engine.ecs.createEntity();
+      engine.ecs.addComponent(pawn, 'Position', { x: 0, y: 0 });
+
+      const food1 = engine.ecs.createEntity();
+      engine.ecs.addComponent(food1, 'Position', { x: 100, y: 0 });
+      engine.ecs.addComponent(food1, 'Food', { nutrition: 30 });
+
+      const food2 = engine.ecs.createEntity();
+      engine.ecs.addComponent(food2, 'Position', { x: 50, y: 0 });
+      engine.ecs.addComponent(food2, 'Food', { nutrition: 30 });
+
+      const nearest = engine.findNearest(pawn, 'Food');
+      expect(nearest).toBe(food2);
+    });
+
+    it('returns null when no entities have the component', () => {
+      const engine = new Engine({ canvas });
+      engine.ecs.defineComponent('Position', { x: 0, y: 0 });
+      engine.ecs.defineComponent('Food', { nutrition: 30 });
+
+      const pawn = engine.ecs.createEntity();
+      engine.ecs.addComponent(pawn, 'Position', { x: 0, y: 0 });
+
+      const nearest = engine.findNearest(pawn, 'Food');
+      expect(nearest).toBeNull();
+    });
+
+    it('returns null when entity has no Position', () => {
+      const engine = new Engine({ canvas });
+      engine.ecs.defineComponent('Position', { x: 0, y: 0 });
+      engine.ecs.defineComponent('Food', { nutrition: 30 });
+
+      const pawn = engine.ecs.createEntity();
+
+      const food = engine.ecs.createEntity();
+      engine.ecs.addComponent(food, 'Position', { x: 50, y: 0 });
+      engine.ecs.addComponent(food, 'Food', { nutrition: 30 });
+
+      const nearest = engine.findNearest(pawn, 'Food');
+      expect(nearest).toBeNull();
+    });
+  });
 });
