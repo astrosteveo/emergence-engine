@@ -43,7 +43,6 @@ engine.ecs.defineComponent('Pawn', {}); // Marker for the controllable pawn
 engine.ecs.defineComponent('PathTarget', { x: 0, y: 0 }); // Target tile
 engine.ecs.defineComponent('PathFollow', { path: [] as PathNode[], nodeIndex: 0 });
 engine.ecs.defineComponent('Hunger', { current: 0, max: 100, rate: 2 }); // rate = per second
-engine.ecs.defineComponent('DestinationMarker', {}); // Marker for destination indicator
 engine.ecs.defineComponent('Food', { nutrition: 30 });
 engine.ecs.defineComponent('CurrentTask', { action: '', target: null as Entity | null });
 engine.ecs.defineComponent('AIState', { lastHungerPercent: 0, needsReeval: true });
@@ -80,9 +79,6 @@ engine.ecs.addComponent(pawn, 'Sprite');
 engine.ecs.addComponent(pawn, 'Pawn');
 engine.ecs.addComponent(pawn, 'Hunger', { current: 25, max: 100, rate: 2 });
 engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval: true });
-
-// Destination marker (hidden until path is set)
-let destinationMarker: Entity | null = null;
 
 // Used by AIDecisionSystem (Task 12)
 export function createActionContext(): ActionContext {
@@ -256,27 +252,12 @@ engine.ecs.addSystem({
       const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
       const target = engine.ecs.getComponent<{ x: number; y: number }>(e, 'PathTarget')!;
 
-      // Convert current position to tile
       const currentTile = engine.camera.worldToTile(pos.x, pos.y, TILE_SIZE);
-
       const path = pathfinder.findPath(currentTile.x, currentTile.y, target.x, target.y);
 
       if (path && path.length > 1) {
-        // Skip first node (current position)
         engine.ecs.addComponent(e, 'PathFollow', { path: path.slice(1), nodeIndex: 0 });
-
-        // Create destination marker
-        if (destinationMarker !== null) {
-          engine.ecs.destroyEntity(destinationMarker);
-        }
-        destinationMarker = engine.ecs.createEntity();
-        engine.ecs.addComponent(destinationMarker, 'Position', {
-          x: target.x * TILE_SIZE + TILE_SIZE / 2,
-          y: target.y * TILE_SIZE + TILE_SIZE / 2,
-        });
-        engine.ecs.addComponent(destinationMarker, 'DestinationMarker');
       } else {
-        // No valid path, remove target
         engine.ecs.removeComponent(e, 'PathTarget');
       }
     }
@@ -300,11 +281,6 @@ engine.ecs.addSystem({
         engine.ecs.removeComponent(e, 'PathFollow');
         if (engine.ecs.hasComponent(e, 'PathTarget')) {
           engine.ecs.removeComponent(e, 'PathTarget');
-        }
-        // Remove destination marker
-        if (destinationMarker !== null) {
-          engine.ecs.destroyEntity(destinationMarker);
-          destinationMarker = null;
         }
         continue;
       }
@@ -396,13 +372,6 @@ engine.onDraw(() => {
 
   // Draw tile map
   engine.renderer.drawTileMap(engine.tileMap, TILE_SIZE);
-
-  // Draw destination marker
-  for (const e of engine.ecs.query(['DestinationMarker', 'Position'])) {
-    const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
-    // Draw a small X
-    engine.renderer.drawCircle(pos.x, pos.y, 4, '#ffdd57');
-  }
 
   // Draw entities (pawns)
   for (const e of engine.ecs.query(['Position', 'Sprite'])) {
