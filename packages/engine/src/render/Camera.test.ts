@@ -186,6 +186,36 @@ describe('Camera', () => {
     });
   });
 
+  describe('screenToTile', () => {
+    it('should convert screen coordinates to tile coordinates', () => {
+      const camera = new Camera(800, 600);
+      camera.centerOn(0, 0);
+      // Screen center (400, 300) -> world (0, 0) -> tile (0, 0) with tileSize 16
+      const tile = camera.screenToTile(400, 300, 16);
+      expect(tile.x).toBe(0);
+      expect(tile.y).toBe(0);
+    });
+
+    it('should account for camera position', () => {
+      const camera = new Camera(800, 600);
+      camera.centerOn(32, 32); // 2 tiles offset
+      // Screen center -> world (32, 32) -> tile (2, 2)
+      const tile = camera.screenToTile(400, 300, 16);
+      expect(tile.x).toBe(2);
+      expect(tile.y).toBe(2);
+    });
+
+    it('should account for zoom', () => {
+      const camera = new Camera(800, 600);
+      camera.centerOn(0, 0);
+      camera.zoomIn(); // 2x zoom
+      // Screen (400 + 16, 300 + 16) with 2x zoom -> world (8, 8) -> tile (0, 0)
+      const tile = camera.screenToTile(400 + 16, 300 + 16, 16);
+      expect(tile.x).toBe(0);
+      expect(tile.y).toBe(0);
+    });
+  });
+
   describe('visible bounds', () => {
     it('should calculate visible tile bounds at 1x zoom', () => {
       const camera = new Camera(800, 600);
