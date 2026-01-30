@@ -4,6 +4,8 @@ A web-based 2D game engine for simulation games. Code-first, browser-native, min
 
 **This is a standalone engine.** Clone it, extend it, build your own games. We're building [Colony](docs/plans/mvp/design.md#target-game-colony) (a RimWorld-like) to prove it works.
 
+![Emergence Engine Demo](docs/screenshot.png)
+
 ## Features
 
 - **Game Loop** — Fixed timestep simulation (20 ticks/sec) with variable rendering
