@@ -19,6 +19,8 @@
 import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
 import type { Entity, PathNode, ActionContext } from 'emergence-engine';
 
+let debugMode = true; // On by default in dev
+
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
 const TILE_SIZE = 16;
@@ -192,6 +194,9 @@ engine.ecs.addSystem({
     }
     if (input.isKeyPressed('Minus') || input.isKeyPressed('NumpadSubtract')) {
       camera.zoomOut();
+    }
+    if (input.isKeyPressed('F3')) {
+      debugMode = !debugMode;
     }
   },
 });
@@ -434,8 +439,42 @@ engine.onDraw(() => {
     { font: '11px monospace', color: '#888888' }
   );
 
+  // Debug overlay (F3 toggle)
+  if (debugMode) {
+    const context = createActionContext();
+    const scores = engine.ai.evaluateAll(pawn, context);
+    const currentTask = engine.ecs.getComponent<{ action: string }>(pawn, 'CurrentTask');
+
+    const debugX = 10;
+    const debugY = canvas.height - 220;
+    const debugWidth = 160;
+    const debugHeight = 100;
+
+    engine.renderer.drawRectScreen(debugX, debugY, debugWidth, debugHeight, 'rgba(26, 26, 46, 0.9)');
+    engine.renderer.drawTextScreen('AI Debug (F3)', debugX + 10, debugY + 22, {
+      font: '14px monospace',
+      color: '#ffffff',
+    });
+
+    let yOffset = 42;
+    for (const { action, score, canExecute } of scores) {
+      const isActive = currentTask?.action === action;
+      const color = !canExecute ? '#666666' : isActive ? '#4ade80' : '#aaaaaa';
+      const marker = isActive ? ' ◄' : '';
+      const scoreText = canExecute ? score.toFixed(2) : '-.--';
+
+      engine.renderer.drawTextScreen(
+        `${action}: ${scoreText}${marker}`,
+        debugX + 10,
+        debugY + yOffset,
+        { font: '12px monospace', color }
+      );
+      yOffset += 18;
+    }
+  }
+
   // Instructions (top-left)
-  engine.renderer.drawTextScreen('Click to move | +/-: Zoom', 10, 30, { color: '#888' });
+  engine.renderer.drawTextScreen('Autonomous mode | +/-: Zoom | F3: Debug', 10, 30, { color: '#888' });
 });
 
 engine.start();
