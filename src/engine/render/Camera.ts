@@ -52,4 +52,23 @@ export class Camera {
     this.x = x;
     this.y = y;
   }
+
+  worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
+    const screenX = (worldX - this.x) * this.zoom + this.viewportWidth / 2;
+    const screenY = (worldY - this.y) * this.zoom + this.viewportHeight / 2;
+    return { x: screenX, y: screenY };
+  }
+
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    const worldX = (screenX - this.viewportWidth / 2) / this.zoom + this.x;
+    const worldY = (screenY - this.viewportHeight / 2) / this.zoom + this.y;
+    return { x: worldX, y: worldY };
+  }
+
+  worldToTile(worldX: number, worldY: number, tileSize: number): { x: number; y: number } {
+    return {
+      x: Math.floor(worldX / tileSize),
+      y: Math.floor(worldY / tileSize),
+    };
+  }
 }

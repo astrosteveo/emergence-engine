@@ -118,4 +118,71 @@ describe('Camera', () => {
       expect(camera.zoom).toBe(1); // Min
     });
   });
+
+  describe('coordinate transforms', () => {
+    it('should transform world to screen at origin', () => {
+      const camera = new Camera(800, 600);
+
+      const screen = camera.worldToScreen(0, 0);
+
+      // World origin maps to screen center
+      expect(screen.x).toBe(400);
+      expect(screen.y).toBe(300);
+    });
+
+    it('should transform world to screen with pan', () => {
+      const camera = new Camera(800, 600);
+      camera.pan(100, 50); // Camera looking at (100, 50)
+
+      const screen = camera.worldToScreen(100, 50);
+
+      // Camera position maps to screen center
+      expect(screen.x).toBe(400);
+      expect(screen.y).toBe(300);
+    });
+
+    it('should transform world to screen with zoom', () => {
+      const camera = new Camera(800, 600);
+      camera.zoomIn(); // 2x zoom
+
+      const screen = camera.worldToScreen(50, 25);
+
+      // At 2x zoom, 50 world units = 100 screen pixels from center
+      expect(screen.x).toBe(500); // 400 + 50*2
+      expect(screen.y).toBe(350); // 300 + 25*2
+    });
+
+    it('should transform screen to world', () => {
+      const camera = new Camera(800, 600);
+
+      const world = camera.screenToWorld(400, 300);
+
+      // Screen center maps to world origin
+      expect(world.x).toBe(0);
+      expect(world.y).toBe(0);
+    });
+
+    it('should round-trip world to screen to world', () => {
+      const camera = new Camera(800, 600);
+      camera.pan(123, 456);
+      camera.zoomIn();
+
+      const original = { x: 78, y: 90 };
+      const screen = camera.worldToScreen(original.x, original.y);
+      const result = camera.screenToWorld(screen.x, screen.y);
+
+      expect(result.x).toBeCloseTo(original.x);
+      expect(result.y).toBeCloseTo(original.y);
+    });
+
+    it('should transform world to tile coordinates', () => {
+      const camera = new Camera(800, 600);
+      const tileSize = 16;
+
+      expect(camera.worldToTile(0, 0, tileSize)).toEqual({ x: 0, y: 0 });
+      expect(camera.worldToTile(16, 16, tileSize)).toEqual({ x: 1, y: 1 });
+      expect(camera.worldToTile(-16, -16, tileSize)).toEqual({ x: -1, y: -1 });
+      expect(camera.worldToTile(8, 8, tileSize)).toEqual({ x: 0, y: 0 }); // Rounds down
+    });
+  });
 });
