@@ -58,7 +58,7 @@ export class Engine {
   }
 
   onTick(callback: (dt: number) => void): void {
-    // Insert before the input.update() call
+    // Runs after ECS systems and input.update() - prefer using ECS systems for game logic
     this.loop.onTick(callback);
   }
 

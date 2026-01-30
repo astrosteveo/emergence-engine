@@ -36,6 +36,60 @@ interface AStarNode {
   parent: AStarNode | null;
 }
 
+/** Min-heap for A* open set, ordered by f score */
+class MinHeap {
+  private heap: AStarNode[] = [];
+
+  get length(): number {
+    return this.heap.length;
+  }
+
+  push(node: AStarNode): void {
+    this.heap.push(node);
+    this.bubbleUp(this.heap.length - 1);
+  }
+
+  pop(): AStarNode | undefined {
+    if (this.heap.length === 0) return undefined;
+    const min = this.heap[0];
+    const last = this.heap.pop()!;
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      this.bubbleDown(0);
+    }
+    return min;
+  }
+
+  private bubbleUp(index: number): void {
+    while (index > 0) {
+      const parentIndex = Math.floor((index - 1) / 2);
+      if (this.heap[parentIndex].f <= this.heap[index].f) break;
+      [this.heap[parentIndex], this.heap[index]] = [this.heap[index], this.heap[parentIndex]];
+      index = parentIndex;
+    }
+  }
+
+  private bubbleDown(index: number): void {
+    const length = this.heap.length;
+    while (true) {
+      const leftChild = 2 * index + 1;
+      const rightChild = 2 * index + 2;
+      let smallest = index;
+
+      if (leftChild < length && this.heap[leftChild].f < this.heap[smallest].f) {
+        smallest = leftChild;
+      }
+      if (rightChild < length && this.heap[rightChild].f < this.heap[smallest].f) {
+        smallest = rightChild;
+      }
+      if (smallest === index) break;
+
+      [this.heap[index], this.heap[smallest]] = [this.heap[smallest], this.heap[index]];
+      index = smallest;
+    }
+  }
+}
+
 export class Pathfinder {
   private maxIterations: number;
 
@@ -57,8 +111,9 @@ export class Pathfinder {
       return [{ x: fromX, y: fromY }];
     }
 
-    const openSet: AStarNode[] = [];
+    const openSet = new MinHeap();
     const closedSet = new Set<string>();
+    const gScores = new Map<string, number>();
 
     const startNode: AStarNode = {
       x: fromX,
@@ -70,22 +125,27 @@ export class Pathfinder {
     };
     startNode.f = startNode.g + startNode.h;
     openSet.push(startNode);
+    gScores.set(`${fromX},${fromY}`, 0);
 
     let iterations = 0;
 
     while (openSet.length > 0 && iterations < this.maxIterations) {
       iterations++;
 
-      // Find node with lowest f score
-      openSet.sort((a, b) => a.f - b.f);
-      const current = openSet.shift()!;
+      const current = openSet.pop()!;
+      const currentKey = `${current.x},${current.y}`;
+
+      // Skip if already processed (stale entry from re-insertion)
+      if (closedSet.has(currentKey)) {
+        continue;
+      }
 
       // Reached goal
       if (current.x === toX && current.y === toY) {
         return this.reconstructPath(current);
       }
 
-      closedSet.add(`${current.x},${current.y}`);
+      closedSet.add(currentKey);
 
       // Check 4-directional neighbors
       const neighbors = [
@@ -103,10 +163,11 @@ export class Pathfinder {
         }
 
         const g = current.g + 1;
-        const existingIndex = openSet.findIndex(n => n.x === neighbor.x && n.y === neighbor.y);
+        const existingG = gScores.get(key);
 
-        if (existingIndex === -1) {
-          // New node
+        // Only process if this is a better path
+        if (existingG === undefined || g < existingG) {
+          gScores.set(key, g);
           const h = this.heuristic(neighbor.x, neighbor.y, toX, toY);
           openSet.push({
             x: neighbor.x,
@@ -116,11 +177,6 @@ export class Pathfinder {
             f: g + h,
             parent: current,
           });
-        } else if (g < openSet[existingIndex].g) {
-          // Better path to existing node
-          openSet[existingIndex].g = g;
-          openSet[existingIndex].f = g + openSet[existingIndex].h;
-          openSet[existingIndex].parent = current;
         }
       }
     }

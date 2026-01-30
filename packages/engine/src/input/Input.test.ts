@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Input } from './Input';
 
 describe('Input', () => {
@@ -24,6 +24,10 @@ describe('Input', () => {
 
   beforeEach(() => {
     input = new Input();
+  });
+
+  afterEach(() => {
+    input.destroy();
   });
 
   function pressKey(code: string): void {
@@ -182,6 +186,20 @@ describe('Input', () => {
       expect(input.isMouseDown('right')).toBe(true);
       mouseDown(1); // middle
       expect(input.isMouseDown('middle')).toBe(true);
+    });
+  });
+
+  describe('cleanup', () => {
+    it('should stop receiving events after destroy', () => {
+      const testInput = new Input();
+      testInput.destroy();
+
+      // Events after destroy should not be tracked
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ' }));
+      expect(testInput.isKeyDown('KeyZ')).toBe(false);
+
+      window.dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+      expect(testInput.isMouseDown('left')).toBe(false);
     });
   });
 });

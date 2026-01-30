@@ -32,13 +32,37 @@ export class Input {
 
   private targetElement: HTMLElement | null = null;
 
+  // Bound handlers for cleanup
+  private boundKeyDown: (e: KeyboardEvent) => void;
+  private boundKeyUp: (e: KeyboardEvent) => void;
+  private boundMouseMove: (e: MouseEvent) => void;
+  private boundMouseDown: (e: MouseEvent) => void;
+  private boundMouseUp: (e: MouseEvent) => void;
+
   constructor(targetElement?: HTMLElement) {
     this.targetElement = targetElement ?? null;
-    window.addEventListener('keydown', (e) => this.handleKeyDown(e));
-    window.addEventListener('keyup', (e) => this.handleKeyUp(e));
-    window.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-    window.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-    window.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+
+    // Bind handlers so they can be removed later
+    this.boundKeyDown = (e) => this.handleKeyDown(e);
+    this.boundKeyUp = (e) => this.handleKeyUp(e);
+    this.boundMouseMove = (e) => this.handleMouseMove(e);
+    this.boundMouseDown = (e) => this.handleMouseDown(e);
+    this.boundMouseUp = (e) => this.handleMouseUp(e);
+
+    window.addEventListener('keydown', this.boundKeyDown);
+    window.addEventListener('keyup', this.boundKeyUp);
+    window.addEventListener('mousemove', this.boundMouseMove);
+    window.addEventListener('mousedown', this.boundMouseDown);
+    window.addEventListener('mouseup', this.boundMouseUp);
+  }
+
+  /** Remove all event listeners. Call when destroying the Input instance. */
+  destroy(): void {
+    window.removeEventListener('keydown', this.boundKeyDown);
+    window.removeEventListener('keyup', this.boundKeyUp);
+    window.removeEventListener('mousemove', this.boundMouseMove);
+    window.removeEventListener('mousedown', this.boundMouseDown);
+    window.removeEventListener('mouseup', this.boundMouseUp);
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
