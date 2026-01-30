@@ -17,6 +17,8 @@
  */
 
 export class Camera {
+  private static readonly ZOOM_LEVELS = [1, 2, 4];
+  private zoomLevel = 0;
   x = 0;
   y = 0;
 
@@ -24,6 +26,22 @@ export class Camera {
     readonly viewportWidth: number,
     readonly viewportHeight: number
   ) {}
+
+  get zoom(): number {
+    return Camera.ZOOM_LEVELS[this.zoomLevel];
+  }
+
+  zoomIn(): void {
+    this.zoomLevel = Math.min(this.zoomLevel + 1, Camera.ZOOM_LEVELS.length - 1);
+  }
+
+  zoomOut(): void {
+    this.zoomLevel = Math.max(this.zoomLevel - 1, 0);
+  }
+
+  setZoomLevel(level: number): void {
+    this.zoomLevel = Math.max(0, Math.min(level, Camera.ZOOM_LEVELS.length - 1));
+  }
 
   pan(dx: number, dy: number): void {
     this.x += dx;
