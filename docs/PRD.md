@@ -26,8 +26,8 @@ The first open-source, browser-native game engine with an integrated editor. Eve
 | Phase 1: Game Loop & Renderer | ✅ Done | Fixed timestep, Canvas 2D |
 | Phase 2: ECS Foundation | ✅ Done | Entities, components, systems |
 | Phase 3: World System | ✅ Done | TileMap, Camera, terrain generation |
-| Phase 4: A Pawn Lives | 🔲 Next | Click-to-move, pathfinding, hunger |
-| Phase 5: Pawn Thinks | 🔲 Planned | Utility AI, actions, food items |
+| Phase 4: A Pawn Lives | ✅ Done | Click-to-move, pathfinding, hunger |
+| Phase 5: Pawn Thinks | 🔲 Next | Utility AI, actions, food items |
 | Phase 6: Two Colonies | 🔲 Planned | Factions, regions, trade |
 
 ### Milestone 2: Browser Editor
