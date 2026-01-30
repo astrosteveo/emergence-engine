@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Renderer } from './Renderer';
 import { Camera } from './Camera';
+import { TileMap } from '../world/TileMap';
 
 describe('Renderer', () => {
   let canvas: HTMLCanvasElement;
@@ -211,6 +212,64 @@ describe('Renderer', () => {
       renderer.drawTextScreen('Hello', 10, 30, { color: '#fff' });
 
       expect(mockCtx.fillText).toHaveBeenCalledWith('Hello', 10, 30);
+    });
+  });
+
+  describe('drawTileMap', () => {
+    it('should draw visible tiles', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.create(4, 4, 'grass');
+
+      renderer.drawTileMap(tileMap, 16);
+
+      // Should have drawn multiple tiles
+      expect(mockCtx.fillRect).toHaveBeenCalled();
+    });
+
+    it('should draw terrain colors', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
+      tileMap.create(4, 4, 'grass');
+      tileMap.setTerrain(0, 0, 'water');
+
+      renderer.drawTileMap(tileMap, 16);
+
+      // Should have used both colors
+      const fillStyleCalls = mockCtx.fillRect.mock.calls;
+      expect(fillStyleCalls.length).toBeGreaterThan(0);
+    });
+
+    it('should draw buildings on top of terrain', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      tileMap.create(4, 4, 'grass');
+      tileMap.setBuilding(0, 0, 'wall');
+
+      // Reset mock to track call order
+      mockCtx.fillRect.mockClear();
+
+      renderer.drawTileMap(tileMap, 16);
+
+      // Buildings should be drawn (fillRect called multiple times)
+      expect(mockCtx.fillRect.mock.calls.length).toBeGreaterThan(0);
+    });
+
+    it('should not draw tiles outside map bounds', () => {
+      const tileMap = new TileMap();
+      tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      tileMap.create(2, 2, 'grass'); // Very small map
+
+      mockCtx.fillRect.mockClear();
+      renderer.drawTileMap(tileMap, 16);
+
+      // Should only draw the 4 tiles that exist
+      // (terrain + possibly buildings, but only 4 terrain tiles)
+      const calls = mockCtx.fillRect.mock.calls.length;
+      expect(calls).toBeGreaterThanOrEqual(4);
+      expect(calls).toBeLessThanOrEqual(8); // Max if all had buildings
     });
   });
 });

@@ -17,6 +17,7 @@
  */
 
 import { Camera } from './Camera';
+import { TileMap } from '../world/TileMap';
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -92,5 +93,33 @@ export class Renderer {
     this.ctx.fillStyle = color;
     this.ctx.textAlign = align;
     this.ctx.fillText(text, screenX, screenY);
+  }
+
+  drawTileMap(tileMap: TileMap, tileSize: number): void {
+    const bounds = this.camera.getVisibleBounds(tileSize);
+
+    // Draw terrain layer
+    for (let y = bounds.minY; y <= bounds.maxY; y++) {
+      for (let x = bounds.minX; x <= bounds.maxX; x++) {
+        const terrain = tileMap.getTerrain(x, y);
+        if (terrain) {
+          const worldX = x * tileSize;
+          const worldY = y * tileSize;
+          this.drawRect(worldX, worldY, tileSize, tileSize, terrain.color);
+        }
+      }
+    }
+
+    // Draw building layer on top
+    for (let y = bounds.minY; y <= bounds.maxY; y++) {
+      for (let x = bounds.minX; x <= bounds.maxX; x++) {
+        const building = tileMap.getBuilding(x, y);
+        if (building) {
+          const worldX = x * tileSize;
+          const worldY = y * tileSize;
+          this.drawRect(worldX, worldY, tileSize, tileSize, building.color);
+        }
+      }
+    }
   }
 }
