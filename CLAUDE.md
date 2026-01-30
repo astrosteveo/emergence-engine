@@ -1,21 +1,27 @@
 # Emergence Engine
 
-2D game engine for simulation games. TypeScript + Vite + Canvas 2D.
+**Standalone 2D game engine** for simulation games. TypeScript + Vite + Canvas 2D.
+
+This is an engine meant for public release, not a game with embedded engine code. The engine (`src/engine/`) is the product; `main.ts` is a demo proving it works.
 
 ## Project Docs
 
 - `docs/plans/mvp/design.md` - Architecture vision and roadmap
-- `docs/plans/mvp/plan.md` - Current phase implementation plan
 - `docs/plans/phase-2-ecs/design.md` - ECS architecture decisions
 - `docs/plans/phase-3-world/plan.md` - World, Camera, TileMap implementation
+
+## Current Status
+
+Phases 1-3 complete. Engine provides: GameLoop, ECS, Input, Camera, TileMap, Terrain Generation, Renderer.
 
 ## Commands
 
 ```bash
-npm run dev          # Start dev server (http://localhost:5173)
-npm run build        # TypeScript check + Vite build
-npm test             # Run tests once
-npm run test:watch   # Tests in watch mode
+npm run dev           # Start dev server (http://localhost:5173)
+npm run build         # TypeScript check + Vite build (demo app)
+npm run build:lib     # Build engine as library for npm publishing
+npm test              # Run tests once
+npm run test:watch    # Tests in watch mode
 npm run test:coverage # Tests with coverage report
 ```
 
@@ -55,6 +61,21 @@ src/
 - Entity IDs use generational indices (20-bit index + 12-bit generation) for stale reference detection
 - Camera uses discrete zoom levels (1x, 2x, 4x) - use `zoomIn()`/`zoomOut()` not arbitrary values
 - TileMap uses center-origin coordinates - (0,0) is map center, not top-left
+
+## Public API
+
+All public exports are in `src/engine/index.ts`. External consumers import from `'emergence-engine'`:
+
+```typescript
+import { Engine, generateTerrain } from 'emergence-engine';
+import type { Entity, System, EngineConfig } from 'emergence-engine';
+```
+
+Key exports:
+- `Engine` - Main entry point (creates ECS, Input, Renderer, TileMap, Camera)
+- `generateTerrain` - Procedural terrain generation
+- `World`, `Entity`, `System` - ECS primitives (also accessible via `engine.ecs`)
+- `Camera`, `Renderer`, `TileMap` - Subsystems (also accessible via engine instance)
 
 ## Git Workflow
 
