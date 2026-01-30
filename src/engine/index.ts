@@ -23,3 +23,8 @@ export { World } from './ecs/World';
 export type { Entity, System } from './ecs/World';
 export { Input } from './input/Input';
 export { Renderer } from './render/Renderer';
+export { Camera } from './render/Camera';
+export { TileMap } from './world/TileMap';
+export type { TerrainDef, BuildingDef } from './world/TileMap';
+export { generateTerrain } from './world/generate';
+export type { GeneratorConfig } from './world/generate';

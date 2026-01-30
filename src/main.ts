@@ -16,30 +16,56 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Engine } from './engine';
+import { Engine, generateTerrain } from './engine';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
+const TILE_SIZE = 16;
 
-// Define components
+// Define terrain types
+engine.tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
+engine.tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+engine.tileMap.defineTerrain('stone', { color: '#6c757d', walkable: true });
+
+// Generate 64x64 world
+generateTerrain(engine.tileMap, { width: 64, height: 64, seed: Date.now() });
+
+// Define components for player
 engine.ecs.defineComponent('Position', { x: 0, y: 0 });
 engine.ecs.defineComponent('Velocity', { x: 0, y: 0 });
 engine.ecs.defineComponent('PlayerControlled', {});
-engine.ecs.defineComponent('Sprite', { width: 32, height: 32, color: '#e94560' });
+engine.ecs.defineComponent('Sprite', { width: 24, height: 24, color: '#e94560' });
 
-// Create player entity
+// Create player entity at world center
 const player = engine.ecs.createEntity();
-engine.ecs.addComponent(player, 'Position', { x: 400, y: 300 });
+engine.ecs.addComponent(player, 'Position', { x: 0, y: 0 });
 engine.ecs.addComponent(player, 'Velocity');
 engine.ecs.addComponent(player, 'PlayerControlled');
 engine.ecs.addComponent(player, 'Sprite');
 
-// Input system: read keys, set velocity
+// Camera control system
+engine.ecs.addSystem({
+  name: 'CameraControl',
+  query: [],
+  update() {
+    const { input, camera } = engine;
+
+    // Zoom controls
+    if (input.isKeyPressed('Equal') || input.isKeyPressed('NumpadAdd')) {
+      camera.zoomIn();
+    }
+    if (input.isKeyPressed('Minus') || input.isKeyPressed('NumpadSubtract')) {
+      camera.zoomOut();
+    }
+  },
+});
+
+// Player input system
 engine.ecs.addSystem({
   name: 'PlayerInput',
   query: ['PlayerControlled', 'Velocity'],
   update(entities) {
-    const speed = 200;
+    const speed = 100;
     for (const e of entities) {
       const vel = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Velocity')!;
       vel.x = 0;
@@ -52,7 +78,7 @@ engine.ecs.addSystem({
   },
 });
 
-// Movement system: apply velocity to position
+// Movement system
 engine.ecs.addSystem({
   name: 'Movement',
   query: ['Position', 'Velocity'],
@@ -66,27 +92,26 @@ engine.ecs.addSystem({
   },
 });
 
-// Bounds system: keep entities on screen
+// Camera follow system
 engine.ecs.addSystem({
-  name: 'Bounds',
-  query: ['Position', 'Sprite'],
+  name: 'CameraFollow',
+  query: ['PlayerControlled', 'Position'],
   update(entities) {
     for (const e of entities) {
       const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
-      const sprite = engine.ecs.getComponent<{ width: number; height: number }>(e, 'Sprite')!;
-      const halfW = sprite.width / 2;
-      const halfH = sprite.height / 2;
-      pos.x = Math.max(halfW, Math.min(engine.renderer.width - halfW, pos.x));
-      pos.y = Math.max(halfH, Math.min(engine.renderer.height - halfH, pos.y));
+      engine.camera.centerOn(pos.x, pos.y);
     }
   },
 });
 
-// Render loop (runs every frame, not every tick)
+// Render loop
 engine.onDraw(() => {
   engine.renderer.clear();
 
-  // Render all sprites
+  // Draw tile map
+  engine.renderer.drawTileMap(engine.tileMap, TILE_SIZE);
+
+  // Draw entities
   for (const e of engine.ecs.query(['Position', 'Sprite'])) {
     const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
     const sprite = engine.ecs.getComponent<{ width: number; height: number; color: string }>(
@@ -96,13 +121,16 @@ engine.onDraw(() => {
     engine.renderer.drawRectCentered(pos.x, pos.y, sprite.width, sprite.height, sprite.color);
   }
 
-  // UI text
+  // UI (screen-space)
   const pos = engine.ecs.getComponent<{ x: number; y: number }>(player, 'Position')!;
-  engine.renderer.drawText('Use arrow keys or WASD to move', 10, 30, { color: '#666' });
-  engine.renderer.drawText(`Position: (${Math.round(pos.x)}, ${Math.round(pos.y)})`, 10, 50, {
-    color: '#666',
+  const tile = engine.camera.worldToTile(pos.x, pos.y, TILE_SIZE);
+  engine.renderer.drawTextScreen('WASD/Arrows: Move | +/-: Zoom', 10, 30, { color: '#888' });
+  engine.renderer.drawTextScreen(`Position: (${Math.round(pos.x)}, ${Math.round(pos.y)})`, 10, 50, {
+    color: '#888',
   });
+  engine.renderer.drawTextScreen(`Tile: (${tile.x}, ${tile.y})`, 10, 70, { color: '#888' });
+  engine.renderer.drawTextScreen(`Zoom: ${engine.camera.zoom}x`, 10, 90, { color: '#888' });
 });
 
 engine.start();
-console.log('Emergence Engine running with ECS...');
+console.log('Emergence Engine Phase 3: World exists!');
