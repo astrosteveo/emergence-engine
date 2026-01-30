@@ -333,6 +333,36 @@ engine.ecs.addSystem({
   },
 });
 
+// Task execution system: handle task completion when arrived
+engine.ecs.addSystem({
+  name: 'TaskExecution',
+  query: ['CurrentTask', 'Position'],
+  update(entities) {
+    for (const e of entities) {
+      if (engine.ecs.hasComponent(e, 'PathFollow') || engine.ecs.hasComponent(e, 'PathTarget')) {
+        continue;
+      }
+
+      const task = engine.ecs.getComponent<{ action: string; target: Entity | null }>(e, 'CurrentTask')!;
+
+      if (task.action === 'eat' && task.target !== null) {
+        if (engine.ecs.isAlive(task.target)) {
+          const food = engine.ecs.getComponent<{ nutrition: number }>(task.target, 'Food');
+          const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger');
+
+          if (food && hunger) {
+            hunger.current = Math.max(0, hunger.current - food.nutrition);
+            engine.ecs.destroyEntity(task.target);
+          }
+        }
+        engine.ecs.removeComponent(e, 'CurrentTask');
+      } else if (task.action === 'wander') {
+        engine.ecs.removeComponent(e, 'CurrentTask');
+      }
+    }
+  },
+});
+
 // Hunger system: increase hunger over time
 engine.ecs.addSystem({
   name: 'Hunger',
