@@ -17,7 +17,7 @@
  */
 
 import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
-import type { Entity, PathNode } from 'emergence-engine';
+import type { Entity, PathNode, ActionContext } from 'emergence-engine';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
@@ -83,6 +83,55 @@ engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval:
 
 // Destination marker (hidden until path is set)
 let destinationMarker: Entity | null = null;
+
+function createActionContext(): ActionContext {
+  return {
+    ecs: {
+      query: (c) => engine.ecs.query(c),
+      getComponent: (e, n) => engine.ecs.getComponent(e, n),
+      hasComponent: (e, n) => engine.ecs.hasComponent(e, n),
+      addComponent: (e, n, d) => engine.ecs.addComponent(e, n, d),
+      removeComponent: (e, n) => engine.ecs.removeComponent(e, n),
+      isAlive: (e) => engine.ecs.isAlive(e),
+    },
+    findNearest: (e, c) => engine.findNearest(e, c),
+  };
+}
+
+engine.ai.defineAction('eat', {
+  canExecute(entity, context) {
+    return context.findNearest(entity, 'Food') !== null;
+  },
+  score(entity, context) {
+    const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
+    if (!hunger) return 0;
+    return hunger.current / hunger.max;
+  },
+  execute(entity, context) {
+    const food = context.findNearest(entity, 'Food');
+    if (!food) return;
+
+    const foodPos = context.ecs.getComponent<{ x: number; y: number }>(food, 'Position');
+    if (!foodPos) return;
+
+    const tileX = Math.floor(foodPos.x / TILE_SIZE);
+    const tileY = Math.floor(foodPos.y / TILE_SIZE);
+
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+
+    context.ecs.addComponent(entity, 'PathTarget', { x: tileX, y: tileY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'eat', target: food });
+  },
+});
 
 // Camera control system
 engine.ecs.addSystem({
