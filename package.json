@@ -1,42 +1,21 @@
 {
-  "name": "emergence-engine",
+  "name": "emergence",
   "version": "0.1.0",
-  "description": "A web-based 2D game engine for simulation games. Code-first, browser-native, minimal by design.",
+  "private": true,
+  "description": "Emergence Engine monorepo - browser-native 2D game engine with integrated editor",
   "type": "module",
-  "main": "./dist/emergence-engine.js",
-  "module": "./dist/emergence-engine.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/emergence-engine.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "files": [
-    "dist",
-    "src/engine",
-    "LICENSE",
-    "README.md"
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "build:lib": "tsc -p tsconfig.lib.json && vite build --config vite.config.lib.ts",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "dev": "npm run dev --workspace=colony",
+    "build": "npm run build --workspace=emergence-engine && npm run build --workspace=colony",
+    "build:engine": "npm run build --workspace=emergence-engine",
+    "build:colony": "npm run build --workspace=colony",
+    "test": "npm run test --workspace=emergence-engine",
+    "test:watch": "npm run test:watch --workspace=emergence-engine",
+    "test:coverage": "npm run test:coverage --workspace=emergence-engine"
   },
-  "keywords": [
-    "game-engine",
-    "2d",
-    "ecs",
-    "entity-component-system",
-    "canvas",
-    "simulation",
-    "typescript",
-    "browser"
-  ],
   "author": "astrosteveo",
   "license": "GPL-3.0",
   "repository": {
@@ -46,12 +25,5 @@
   "bugs": {
     "url": "https://github.com/astrosteveo/emergence-engine/issues"
   },
-  "homepage": "https://github.com/astrosteveo/emergence-engine#readme",
-  "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.18",
-    "jsdom": "^27.4.0",
-    "typescript": "^5.3.0",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18"
-  }
+  "homepage": "https://github.com/astrosteveo/emergence-engine#readme"
 }

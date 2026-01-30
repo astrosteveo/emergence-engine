@@ -22,13 +22,23 @@ import { resolve } from 'path';
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/engine/index.ts'),
+      entry: resolve(__dirname, 'src/index.ts'),
       name: 'EmergenceEngine',
       fileName: 'emergence-engine',
       formats: ['es'],
     },
     outDir: 'dist',
-    emptyOutDir: false, // Preserve .d.ts files from tsc
+    emptyOutDir: false,
     sourcemap: true,
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/index.ts'],
+    },
   },
 });

@@ -1,14 +1,16 @@
 # Emergence Engine
 
-**Standalone 2D game engine** for simulation games. TypeScript + Vite + Canvas 2D.
+**Browser-native 2D game engine** with integrated editor for simulation games. TypeScript + Vite + Canvas 2D.
 
-This is an engine meant for public release, not a game with embedded engine code. The engine (`src/engine/`) is the product; `main.ts` is a demo proving it works.
+Monorepo containing:
+- `packages/engine/` - Emergence Engine (the product)
+- `packages/colony/` - Colony game (built with the engine, proves it works)
 
 ## Project Docs
 
-- `docs/plans/mvp/design.md` - Architecture vision and roadmap
-- `docs/plans/phase-2-ecs/design.md` - ECS architecture decisions
-- `docs/plans/phase-3-world/plan.md` - World, Camera, TileMap implementation
+- `docs/PRD.md` - Product vision and milestones (living document)
+- `docs/plans/mvp/design.md` - Architecture and API design
+- `docs/plans/phase-N-*/` - Individual phase designs and plans
 
 ## Current Status
 
@@ -17,27 +19,44 @@ Phases 1-3 complete. Engine provides: GameLoop, ECS, Input, Camera, TileMap, Ter
 ## Commands
 
 ```bash
-npm run dev           # Start dev server (http://localhost:5173)
-npm run build         # TypeScript check + Vite build (demo app)
-npm run build:lib     # Build engine as library for npm publishing
-npm test              # Run tests once
+# From repository root
+npm run dev           # Start Colony dev server (http://localhost:5173)
+npm run build         # Build engine, then Colony
+npm run build:engine  # Build engine only
+npm run build:colony  # Build Colony only
+npm test              # Run engine tests once
 npm run test:watch    # Tests in watch mode
 npm run test:coverage # Tests with coverage report
+
+# From packages/engine
+npm run build         # Build engine library
+npm test              # Run tests
+
+# From packages/colony
+npm run dev           # Start dev server
+npm run build         # Build for production
 ```
 
 ## Architecture
 
 ```
-src/
-├── engine/           # Core engine (importable API)
-│   ├── core/         # GameLoop (fixed timestep)
-│   ├── ecs/          # Entity-Component-System
-│   ├── input/        # Keyboard polling
-│   ├── render/       # Canvas 2D primitives + Camera
-│   ├── world/        # TileMap, terrain generation, noise
-│   ├── Engine.ts     # Unified entry point
-│   └── index.ts      # Public exports
-└── main.ts           # Demo application
+packages/
+├── engine/                 # Emergence Engine (npm: emergence-engine)
+│   ├── src/
+│   │   ├── core/           # GameLoop (fixed timestep)
+│   │   ├── ecs/            # Entity-Component-System
+│   │   ├── input/          # Keyboard polling (mouse coming Phase 4)
+│   │   ├── render/         # Canvas 2D primitives + Camera
+│   │   ├── world/          # TileMap, terrain generation, noise
+│   │   ├── Engine.ts       # Unified entry point
+│   │   └── index.ts        # Public exports
+│   └── package.json
+│
+└── colony/                 # Colony game (uses engine API)
+    ├── src/
+    │   └── main.ts         # Game entry point
+    ├── index.html
+    └── package.json        # depends on emergence-engine
 ```
 
 ## Code Style
@@ -64,7 +83,7 @@ src/
 
 ## Public API
 
-All public exports are in `src/engine/index.ts`. External consumers import from `'emergence-engine'`:
+All public exports are in `packages/engine/src/index.ts`. Colony (and external consumers) import from `'emergence-engine'`:
 
 ```typescript
 import { Engine, generateTerrain } from 'emergence-engine';
@@ -80,4 +99,4 @@ Key exports:
 ## Git Workflow
 
 - Branch naming: `feature/phase-N-description`
-- GPL-3.0 license - use `gh repo create --license gpl-3.0`
+- GPL-3.0 license

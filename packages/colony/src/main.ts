@@ -1,5 +1,5 @@
 /*
- * This file is part of Emergence Engine.
+ * This file is part of Colony.
  * Copyright (C) 2026 astrosteveo
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Engine, generateTerrain } from './engine';
+import { Engine, generateTerrain } from 'emergence-engine';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
@@ -133,4 +133,4 @@ engine.onDraw(() => {
 });
 
 engine.start();
-console.log('Emergence Engine Phase 3: World exists!');
+console.log('Colony - Built with Emergence Engine');
