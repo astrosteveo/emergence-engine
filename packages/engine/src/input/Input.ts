@@ -30,7 +30,10 @@ export class Input {
   private mouseButtonsPressed: Set<MouseButton> = new Set();
   private mouseButtonsReleased: Set<MouseButton> = new Set();
 
-  constructor() {
+  private targetElement: HTMLElement | null = null;
+
+  constructor(targetElement?: HTMLElement) {
+    this.targetElement = targetElement ?? null;
     window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     window.addEventListener('keyup', (e) => this.handleKeyUp(e));
     window.addEventListener('mousemove', (e) => this.handleMouseMove(e));
@@ -51,8 +54,14 @@ export class Input {
   }
 
   private handleMouseMove(e: MouseEvent): void {
-    this.mouseX = e.clientX;
-    this.mouseY = e.clientY;
+    if (this.targetElement) {
+      const rect = this.targetElement.getBoundingClientRect();
+      this.mouseX = e.clientX - rect.left;
+      this.mouseY = e.clientY - rect.top;
+    } else {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+    }
   }
 
   private buttonFromEvent(e: MouseEvent): MouseButton {
