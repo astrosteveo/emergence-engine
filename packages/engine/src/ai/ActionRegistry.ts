@@ -36,6 +36,12 @@ export interface ActionDefinition {
   execute(entity: Entity, context: ActionContext): void;
 }
 
+export interface ActionScore {
+  action: string;
+  score: number;
+  canExecute: boolean;
+}
+
 export class ActionRegistry {
   private actions = new Map<string, ActionDefinition>();
 
@@ -48,5 +54,25 @@ export class ActionRegistry {
 
   hasAction(name: string): boolean {
     return this.actions.has(name);
+  }
+
+  evaluateAll(entity: Entity, context: ActionContext): ActionScore[] {
+    const scores: ActionScore[] = [];
+
+    for (const [name, definition] of this.actions) {
+      const canExec = definition.canExecute(entity, context);
+      const score = canExec ? definition.score(entity, context) : 0;
+      scores.push({ action: name, score, canExecute: canExec });
+    }
+
+    // Sort by score descending, non-executable at end
+    scores.sort((a, b) => {
+      if (a.canExecute !== b.canExecute) {
+        return a.canExecute ? -1 : 1;
+      }
+      return b.score - a.score;
+    });
+
+    return scores;
   }
 }

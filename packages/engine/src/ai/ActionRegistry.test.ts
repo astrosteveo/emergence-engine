@@ -17,7 +17,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ActionRegistry } from './ActionRegistry';
+import { ActionRegistry, ActionContext } from './ActionRegistry';
+import { World } from '../ecs/World';
 
 describe('ActionRegistry', () => {
   it('allows defining an action', () => {
@@ -48,5 +49,57 @@ describe('ActionRegistry', () => {
         execute: () => {},
       });
     }).toThrow('Action "test" already defined');
+  });
+
+  describe('evaluateAll', () => {
+    it('returns scores for all executable actions', () => {
+      const registry = new ActionRegistry();
+      const ecs = new World();
+      ecs.defineComponent('Hunger', { current: 50, max: 100 });
+
+      const entity = ecs.createEntity();
+      ecs.addComponent(entity, 'Hunger', { current: 50, max: 100 });
+
+      registry.defineAction('eat', {
+        canExecute: () => true,
+        score: (e, ctx) => {
+          const hunger = ctx.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger')!;
+          return hunger.current / hunger.max;
+        },
+        execute: () => {},
+      });
+
+      registry.defineAction('sleep', {
+        canExecute: () => false, // Cannot execute
+        score: () => 0.8,
+        execute: () => {},
+      });
+
+      registry.defineAction('wander', {
+        canExecute: () => true,
+        score: () => 0.1,
+        execute: () => {},
+      });
+
+      const context: ActionContext = {
+        ecs: {
+          query: (c) => ecs.query(c),
+          getComponent: (e, n) => ecs.getComponent(e, n),
+          hasComponent: (e, n) => ecs.hasComponent(e, n),
+          addComponent: (e, n, d) => ecs.addComponent(e, n, d),
+          removeComponent: (e, n) => ecs.removeComponent(e, n),
+          isAlive: (e) => ecs.isAlive(e),
+        },
+        findNearest: () => null,
+      };
+
+      const scores = registry.evaluateAll(entity, context);
+
+      expect(scores).toEqual([
+        { action: 'eat', score: 0.5, canExecute: true },
+        { action: 'wander', score: 0.1, canExecute: true },
+        { action: 'sleep', score: 0, canExecute: false },
+      ]);
+    });
   });
 });
