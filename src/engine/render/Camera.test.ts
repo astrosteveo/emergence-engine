@@ -185,4 +185,46 @@ describe('Camera', () => {
       expect(camera.worldToTile(8, 8, tileSize)).toEqual({ x: 0, y: 0 }); // Rounds down
     });
   });
+
+  describe('visible bounds', () => {
+    it('should calculate visible tile bounds at 1x zoom', () => {
+      const camera = new Camera(800, 600);
+      const tileSize = 16;
+
+      const bounds = camera.getVisibleBounds(tileSize);
+
+      // 800/16 = 50 tiles wide, 600/16 = 37.5 tiles tall
+      // Centered at origin: -25 to 25, -19 to 19 (with padding)
+      expect(bounds.minX).toBeLessThanOrEqual(-25);
+      expect(bounds.maxX).toBeGreaterThanOrEqual(25);
+      expect(bounds.minY).toBeLessThanOrEqual(-18);
+      expect(bounds.maxY).toBeGreaterThanOrEqual(18);
+    });
+
+    it('should calculate visible tile bounds with pan', () => {
+      const camera = new Camera(800, 600);
+      camera.centerOn(160, 160); // 10 tiles right and down
+      const tileSize = 16;
+
+      const bounds = camera.getVisibleBounds(tileSize);
+
+      // Should be shifted by 10 tiles
+      expect(bounds.minX).toBeLessThanOrEqual(-15);
+      expect(bounds.maxX).toBeGreaterThanOrEqual(35);
+    });
+
+    it('should calculate smaller visible bounds at higher zoom', () => {
+      const camera = new Camera(800, 600);
+      const tileSize = 16;
+
+      const bounds1x = camera.getVisibleBounds(tileSize);
+      camera.zoomIn(); // 2x
+      const bounds2x = camera.getVisibleBounds(tileSize);
+
+      // At 2x zoom, visible area should be half the size
+      const width1x = bounds1x.maxX - bounds1x.minX;
+      const width2x = bounds2x.maxX - bounds2x.minX;
+      expect(width2x).toBeLessThan(width1x);
+    });
+  });
 });

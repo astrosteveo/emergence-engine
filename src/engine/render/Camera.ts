@@ -71,4 +71,23 @@ export class Camera {
       y: Math.floor(worldY / tileSize),
     };
   }
+
+  getVisibleBounds(tileSize: number): { minX: number; minY: number; maxX: number; maxY: number } {
+    // Calculate world-space bounds of the viewport
+    const halfViewportWorldWidth = this.viewportWidth / this.zoom / 2;
+    const halfViewportWorldHeight = this.viewportHeight / this.zoom / 2;
+
+    const worldMinX = this.x - halfViewportWorldWidth;
+    const worldMaxX = this.x + halfViewportWorldWidth;
+    const worldMinY = this.y - halfViewportWorldHeight;
+    const worldMaxY = this.y + halfViewportWorldHeight;
+
+    // Convert to tile coordinates with 1-tile padding for partial tiles
+    return {
+      minX: Math.floor(worldMinX / tileSize) - 1,
+      maxX: Math.ceil(worldMaxX / tileSize) + 1,
+      minY: Math.floor(worldMinY / tileSize) - 1,
+      maxY: Math.ceil(worldMaxY / tileSize) + 1,
+    };
+  }
 }
