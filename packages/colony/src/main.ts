@@ -385,10 +385,13 @@ engine.onDraw(() => {
 
   // UI: Stats panel (screen-space, bottom-left)
   const hunger = engine.ecs.getComponent<{ current: number; max: number }>(pawn, 'Hunger')!;
+  const currentTask = engine.ecs.getComponent<{ action: string; target: Entity | null }>(pawn, 'CurrentTask');
+  const taskLabel = currentTask ? currentTask.action.charAt(0).toUpperCase() + currentTask.action.slice(1) : 'Idle';
+
   const panelX = 10;
-  const panelY = canvas.height - 90;
+  const panelY = canvas.height - 110;
   const panelWidth = 160;
-  const panelHeight = 80;
+  const panelHeight = 100;
 
   // Panel background
   engine.renderer.drawRectScreen(panelX, panelY, panelWidth, panelHeight, 'rgba(26, 26, 46, 0.9)');
@@ -399,15 +402,21 @@ engine.onDraw(() => {
     color: '#ffffff',
   });
 
+  // Task label
+  engine.renderer.drawTextScreen(`Task: ${taskLabel}`, panelX + 10, panelY + 42, {
+    font: '12px monospace',
+    color: '#aaaaaa',
+  });
+
   // Hunger label
-  engine.renderer.drawTextScreen('Hunger', panelX + 10, panelY + 45, {
+  engine.renderer.drawTextScreen('Hunger', panelX + 10, panelY + 62, {
     font: '12px monospace',
     color: '#aaaaaa',
   });
 
   // Hunger bar background
   const barX = panelX + 10;
-  const barY = panelY + 52;
+  const barY = panelY + 69;
   const barWidth = 120;
   const barHeight = 14;
   engine.renderer.drawRectScreen(barX, barY, barWidth, barHeight, '#333333');
