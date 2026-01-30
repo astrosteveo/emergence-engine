@@ -23,9 +23,18 @@ export interface TerrainDef {
   walkable: boolean;
 }
 
+export interface BuildingDef {
+  id: number;
+  name: string;
+  color: string;
+  solid: boolean;
+}
+
 export class TileMap {
   private terrainDefs: Map<string, TerrainDef> = new Map();
   private nextTerrainId = 1; // 0 reserved for "no terrain"
+  private buildingDefs: Map<string, BuildingDef> = new Map();
+  private nextBuildingId = 1; // 0 reserved for "no building"
 
   defineTerrain(name: string, def: Omit<TerrainDef, 'id' | 'name'>): void {
     if (this.terrainDefs.has(name)) {
@@ -40,5 +49,20 @@ export class TileMap {
 
   getTerrainDef(name: string): TerrainDef | undefined {
     return this.terrainDefs.get(name);
+  }
+
+  defineBuilding(name: string, def: Omit<BuildingDef, 'id' | 'name'>): void {
+    if (this.buildingDefs.has(name)) {
+      throw new Error(`Building "${name}" already defined`);
+    }
+    this.buildingDefs.set(name, {
+      id: this.nextBuildingId++,
+      name,
+      ...def,
+    });
+  }
+
+  getBuildingDef(name: string): BuildingDef | undefined {
+    return this.buildingDefs.get(name);
   }
 }

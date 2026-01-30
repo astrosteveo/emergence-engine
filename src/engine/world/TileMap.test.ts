@@ -60,4 +60,43 @@ describe('TileMap', () => {
       expect(tileMap.getTerrainDef('unknown')).toBeUndefined();
     });
   });
+
+  describe('building registry', () => {
+    it('should define building types', () => {
+      const tileMap = new TileMap();
+
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+
+      const def = tileMap.getBuildingDef('wall');
+      expect(def).toBeDefined();
+      expect(def!.name).toBe('wall');
+      expect(def!.color).toBe('#4a4a4a');
+      expect(def!.solid).toBe(true);
+      expect(def!.id).toBe(1);
+    });
+
+    it('should assign sequential IDs to building types', () => {
+      const tileMap = new TileMap();
+
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      tileMap.defineBuilding('door', { color: '#8b4513', solid: false });
+
+      expect(tileMap.getBuildingDef('wall')!.id).toBe(1);
+      expect(tileMap.getBuildingDef('door')!.id).toBe(2);
+    });
+
+    it('should throw when defining duplicate building', () => {
+      const tileMap = new TileMap();
+      tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+
+      expect(() => tileMap.defineBuilding('wall', { color: '#fff', solid: false }))
+        .toThrow('Building "wall" already defined');
+    });
+
+    it('should return undefined for unknown building', () => {
+      const tileMap = new TileMap();
+
+      expect(tileMap.getBuildingDef('unknown')).toBeUndefined();
+    });
+  });
 });
