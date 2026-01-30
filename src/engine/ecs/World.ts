@@ -31,10 +31,17 @@ function makeEntity(index: number, gen: number): Entity {
   return (gen << 20) | index;
 }
 
+interface ComponentDefinition<T = unknown> {
+  name: string;
+  defaults: T;
+  storage: (T | undefined)[];
+}
+
 export class World {
   private generations: number[] = [];
   private alive: boolean[] = [];
   private freeList: number[] = [];
+  private components = new Map<string, ComponentDefinition>();
 
   createEntity(): Entity {
     const index = this.freeList.pop() ?? this.generations.length;
@@ -55,8 +62,53 @@ export class World {
   destroyEntity(entity: Entity): void {
     const index = entityIndex(entity);
     if (!this.isAlive(entity)) return;
+    // Remove all components
+    for (const def of this.components.values()) {
+      def.storage[index] = undefined;
+    }
     this.alive[index] = false;
     this.generations[index]++;
     this.freeList.push(index);
+  }
+
+  defineComponent<T extends object>(name: string, defaults: T): void {
+    if (this.components.has(name)) {
+      throw new Error(`Component "${name}" already defined`);
+    }
+    this.components.set(name, { name, defaults, storage: [] });
+  }
+
+  addComponent<T extends object>(entity: Entity, name: string, data?: Partial<T>): T {
+    if (!this.isAlive(entity)) {
+      throw new Error('Cannot add component to dead entity');
+    }
+    const def = this.components.get(name);
+    if (!def) {
+      throw new Error(`Component "${name}" not defined`);
+    }
+    const index = entityIndex(entity);
+    const component = { ...def.defaults, ...data } as T;
+    def.storage[index] = component;
+    return component;
+  }
+
+  getComponent<T>(entity: Entity, name: string): T | undefined {
+    if (!this.isAlive(entity)) return undefined;
+    const def = this.components.get(name);
+    return def?.storage[entityIndex(entity)] as T | undefined;
+  }
+
+  hasComponent(entity: Entity, name: string): boolean {
+    if (!this.isAlive(entity)) return false;
+    const def = this.components.get(name);
+    return def?.storage[entityIndex(entity)] !== undefined;
+  }
+
+  removeComponent(entity: Entity, name: string): void {
+    if (!this.isAlive(entity)) return;
+    const def = this.components.get(name);
+    if (def) {
+      def.storage[entityIndex(entity)] = undefined;
+    }
   }
 }
