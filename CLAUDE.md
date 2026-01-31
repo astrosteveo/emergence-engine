@@ -14,7 +14,7 @@ Monorepo containing:
 
 ## Current Status
 
-Phases 1-5 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry).
+Phases 1-6 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry). Colony game demonstrates multi-colony caravan system.
 
 ## Commands
 
@@ -92,17 +92,18 @@ All public exports are in `packages/engine/src/index.ts`. Colony (and external c
 
 ```typescript
 import { Engine, generateTerrain, Pathfinder, ActionRegistry } from 'emergence-engine';
-import type { Entity, System, EngineConfig, PathNode, ActionDefinition, ActionContext } from 'emergence-engine';
+import type { Entity, System, EngineConfig, PathNode, ActionDefinition, ActionContext, TerrainDef, BuildingDef, GeneratorConfig, ActionScore, MouseButton } from 'emergence-engine';
 ```
 
 Key exports:
 - `Engine` - Main entry point (creates ECS, Input, Renderer, TileMap, Camera)
+- `GameLoop` - Fixed timestep game loop (also accessible via `engine.loop`)
 - `generateTerrain` - Procedural terrain generation
 - `Pathfinder` - A* pathfinding with walkability callback
 - `World`, `Entity`, `System` - ECS primitives (also accessible via `engine.ecs`)
 - `Camera`, `Renderer`, `TileMap` - Subsystems (also accessible via engine instance)
 - `ActionRegistry` - Utility AI framework for autonomous entities (also accessible via `engine.ai`)
-- `MouseButton`, `PathNode`, `ActionDefinition`, `ActionContext` - Type exports
+- Type exports: `MouseButton`, `PathNode`, `ActionDefinition`, `ActionContext`, `TerrainDef`, `BuildingDef`, `GeneratorConfig`, `ActionScore`
 
 ## Git Workflow
 

@@ -260,7 +260,7 @@ packages/
 - [x] Phase 3: World — TileMap, Camera, terrain generation
 - [x] Phase 4: A Pawn Lives — Click-to-move, pathfinding, hunger
 - [x] Phase 5: Pawn Thinks — Utility AI, actions, autonomous behavior
-- [ ] Phase 6: Two Colonies — Factions, regions, trade
+- [x] Phase 6: Two Colonies — Factions, regions, caravan trade
 
 ## License
 
