@@ -626,6 +626,18 @@ engine.ecs.addSystem({
           }
         }
         engine.ecs.removeComponent(e, 'CurrentTask');
+      } else if (task.action === 'eat-stockpile' && task.target !== null) {
+        if (engine.ecs.isAlive(task.target)) {
+          const stockpile = engine.ecs.getComponent<{ food: number }>(task.target, 'Stockpile');
+          const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger');
+
+          if (stockpile && hunger && stockpile.food > 0) {
+            const consumed = Math.min(30, stockpile.food); // Consume up to 30 nutrition
+            stockpile.food -= consumed;
+            hunger.current = Math.max(0, hunger.current - consumed);
+          }
+        }
+        engine.ecs.removeComponent(e, 'CurrentTask');
       } else if (task.action === 'wander') {
         engine.ecs.removeComponent(e, 'CurrentTask');
       }
