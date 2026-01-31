@@ -108,4 +108,6 @@ Key exports:
 ## Git Workflow
 
 - Branch naming: `feature/phase-N-description`
+- Branch naming for docs: `docs/description`
+- Status updates: keep CLAUDE.md, README.md, and docs/PRD.md in sync
 - GPL-3.0 license
