@@ -368,6 +368,70 @@ engine.ecs.addSystem({
   },
 });
 
+// Proximity signal system: hear "we need food" from nearby low-food stockpiles
+engine.ecs.addSystem({
+  name: 'ProximitySignal',
+  query: ['Pawn', 'Position', 'Faction', 'ColonyMemory'],
+  update(entities) {
+    const stockpiles = engine.ecs.query(['Stockpile', 'Position']);
+
+    for (const pawn of entities) {
+      const pawnPos = engine.ecs.getComponent<{ x: number; y: number }>(pawn, 'Position')!;
+      const pawnFaction = engine.ecs.getComponent<{ id: string }>(pawn, 'Faction')!;
+      const memory = engine.ecs.getComponent<{
+        known: Array<{
+          factionId: string;
+          stockpileX: number;
+          stockpileY: number;
+          lastSeenFood: number;
+          ticksSinceVisit: number;
+        }>;
+      }>(pawn, 'ColonyMemory')!;
+
+      const pawnTileX = Math.floor(pawnPos.x / TILE_SIZE);
+      const pawnTileY = Math.floor(pawnPos.y / TILE_SIZE);
+
+      for (const s of stockpiles) {
+        const stockpileComp = engine.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+        const stockpilePos = engine.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+
+        // Skip own faction
+        if (stockpileComp.factionId === pawnFaction.id) continue;
+
+        // Only broadcast if in deficit
+        if (stockpileComp.food >= DEFICIT_THRESHOLD) continue;
+
+        const stockpileTileX = Math.floor(stockpilePos.x / TILE_SIZE);
+        const stockpileTileY = Math.floor(stockpilePos.y / TILE_SIZE);
+
+        const dx = pawnTileX - stockpileTileX;
+        const dy = pawnTileY - stockpileTileY;
+        const distSq = dx * dx + dy * dy;
+
+        // Within signal range
+        if (distSq <= PROXIMITY_SIGNAL_RANGE * PROXIMITY_SIGNAL_RANGE) {
+          const existing = memory.known.find((k) => k.factionId === stockpileComp.factionId);
+          if (existing) {
+            // Update if this info is fresher (they're broadcasting need)
+            existing.lastSeenFood = stockpileComp.food;
+            existing.stockpileX = stockpileTileX;
+            existing.stockpileY = stockpileTileY;
+            // Don't reset ticksSinceVisit - they haven't actually visited
+          } else {
+            memory.known.push({
+              factionId: stockpileComp.factionId,
+              stockpileX: stockpileTileX,
+              stockpileY: stockpileTileY,
+              lastSeenFood: stockpileComp.food,
+              ticksSinceVisit: MEMORY_DECAY_TICKS, // Mark as stale since not visited
+            });
+          }
+        }
+      }
+    }
+  },
+});
+
 // AI Decision system: re-evaluate when needed
 engine.ecs.addSystem({
   name: 'AIDecision',
