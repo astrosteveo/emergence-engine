@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Engine, generateTerrain } from 'emergence-engine';
 import { EditorProvider, EditorShell } from 'emergence-editor';
 import 'emergence-editor/styles.css';
-import { colonyDefinitions, TILE_SIZE } from './definitions';
+import { colonyDefinitions } from './definitions';
 import { setupColonyEngine } from './setup';
 import { setupColonyRenderer } from './render';
 import './styles/index.css';
