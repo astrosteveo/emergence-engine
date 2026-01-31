@@ -478,4 +478,4 @@ engine.onDraw(() => {
 });
 
 engine.start();
-console.log('Colony - Built with Emergence Engine (Phase 4: A Pawn Lives)');
+console.log('Colony - Built with Emergence Engine (Phase 5: Pawn Thinks)');
