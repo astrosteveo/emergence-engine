@@ -970,10 +970,24 @@ engine.onDraw(() => {
     engine.renderer.drawRectCentered(pos.x, pos.y, sprite.width, sprite.height, sprite.color);
   }
 
+  // Draw stockpile food counts
+  for (const s of engine.ecs.query(['Stockpile', 'Position'])) {
+    const stockpile = engine.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+    const pos = engine.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+    const screenPos = engine.camera.worldToScreen(pos.x, pos.y - 24);
+    engine.renderer.drawTextScreen(`${stockpile.food}`, screenPos.x, screenPos.y, {
+      font: '14px monospace',
+      color: '#ffffff',
+      align: 'center',
+    });
+  }
+
   // UI: Stats panel (screen-space, bottom-left)
-  const hunger = engine.ecs.getComponent<{ current: number; max: number }>(pawn, 'Hunger')!;
-  const currentTask = engine.ecs.getComponent<{ action: string; target: Entity | null }>(pawn, 'CurrentTask');
-  const taskLabel = currentTask ? currentTask.action.charAt(0).toUpperCase() + currentTask.action.slice(1) : 'Idle';
+  const selectedPawn = redPawn1; // Track first red pawn
+  const selectedHunger = engine.ecs.getComponent<{ current: number; max: number }>(selectedPawn, 'Hunger')!;
+  const selectedTask = engine.ecs.getComponent<{ action: string; target: Entity | null }>(selectedPawn, 'CurrentTask');
+  const selectedFaction = engine.ecs.getComponent<{ id: string }>(selectedPawn, 'Faction');
+  const taskLabel = selectedTask ? selectedTask.action.charAt(0).toUpperCase() + selectedTask.action.slice(1) : 'Idle';
 
   const panelX = 10;
   const panelY = canvas.height - 110;
@@ -984,7 +998,8 @@ engine.onDraw(() => {
   engine.renderer.drawRectScreen(panelX, panelY, panelWidth, panelHeight, 'rgba(26, 26, 46, 0.9)');
 
   // Title
-  engine.renderer.drawTextScreen('Pawn Stats', panelX + 10, panelY + 22, {
+  const factionLabel = selectedFaction ? ` (${selectedFaction.id})` : '';
+  engine.renderer.drawTextScreen(`Pawn${factionLabel}`, panelX + 10, panelY + 22, {
     font: '14px monospace',
     color: '#ffffff',
   });
@@ -1009,13 +1024,13 @@ engine.onDraw(() => {
   engine.renderer.drawRectScreen(barX, barY, barWidth, barHeight, '#333333');
 
   // Hunger bar fill
-  const fillWidth = barWidth * (hunger.current / hunger.max);
-  const hungerColor = hunger.current > 70 ? '#e94560' : hunger.current > 40 ? '#ffdd57' : '#4ade80';
+  const fillWidth = barWidth * (selectedHunger.current / selectedHunger.max);
+  const hungerColor = selectedHunger.current > 70 ? '#e94560' : selectedHunger.current > 40 ? '#ffdd57' : '#4ade80';
   engine.renderer.drawRectScreen(barX, barY, fillWidth, barHeight, hungerColor);
 
   // Hunger value
   engine.renderer.drawTextScreen(
-    `${Math.round(hunger.current)}/${hunger.max}`,
+    `${Math.round(selectedHunger.current)}/${selectedHunger.max}`,
     barX + barWidth + 5,
     barY + 11,
     { font: '11px monospace', color: '#888888' }
@@ -1024,13 +1039,20 @@ engine.onDraw(() => {
   // Debug overlay (` toggle)
   if (debugMode) {
     const context = createActionContext();
-    const scores = engine.ai.evaluateAll(pawn, context);
-    const currentTask = engine.ecs.getComponent<{ action: string }>(pawn, 'CurrentTask');
+
+    // Find the selected pawn (first red pawn for now)
+    const debugPawn = redPawn1;
+
+    const scores = engine.ai.evaluateAll(debugPawn, context);
+    const currentTask = engine.ecs.getComponent<{ action: string }>(debugPawn, 'CurrentTask');
+    const caravanTask = engine.ecs.getComponent<{ phase: string; targetFactionId: string }>(debugPawn, 'CaravanTask');
+    const inventory = engine.ecs.getComponent<{ food: number }>(debugPawn, 'Inventory');
+    const memory = engine.ecs.getComponent<{ known: Array<{ factionId: string; lastSeenFood: number }> }>(debugPawn, 'ColonyMemory');
 
     const debugX = 10;
-    const debugY = canvas.height - 220;
-    const debugWidth = 160;
-    const debugHeight = 100;
+    let debugY = canvas.height - 340;
+    const debugWidth = 180;
+    const debugHeight = 220;
 
     engine.renderer.drawRectScreen(debugX, debugY, debugWidth, debugHeight, 'rgba(26, 26, 46, 0.9)');
     engine.renderer.drawTextScreen('AI Debug (`)', debugX + 10, debugY + 22, {
@@ -1039,6 +1061,44 @@ engine.onDraw(() => {
     });
 
     let yOffset = 42;
+
+    // Show caravan status if active
+    if (caravanTask) {
+      engine.renderer.drawTextScreen(`Caravan: ${caravanTask.phase}`, debugX + 10, debugY + yOffset, {
+        font: '12px monospace',
+        color: '#fbbf24',
+      });
+      yOffset += 18;
+    }
+
+    // Show inventory
+    if (inventory) {
+      engine.renderer.drawTextScreen(`Carrying: ${inventory.food} food`, debugX + 10, debugY + yOffset, {
+        font: '12px monospace',
+        color: '#60a5fa',
+      });
+      yOffset += 18;
+    }
+
+    // Show known colonies
+    if (memory && memory.known.length > 0) {
+      engine.renderer.drawTextScreen('Known colonies:', debugX + 10, debugY + yOffset, {
+        font: '12px monospace',
+        color: '#888888',
+      });
+      yOffset += 16;
+      for (const k of memory.known) {
+        engine.renderer.drawTextScreen(`  ${k.factionId}: ${k.lastSeenFood} food`, debugX + 10, debugY + yOffset, {
+          font: '11px monospace',
+          color: '#aaaaaa',
+        });
+        yOffset += 14;
+      }
+    }
+
+    yOffset += 4;
+
+    // Show action scores
     for (const { action, score, canExecute } of scores) {
       const isActive = currentTask?.action === action;
       const color = !canExecute ? '#666666' : isActive ? '#4ade80' : '#aaaaaa';
