@@ -26,6 +26,14 @@ const engine = new Engine({ canvas, tickRate: 20 });
 const TILE_SIZE = 16;
 const PAWN_SPEED = 80; // pixels per second
 
+// Phase 6 constants
+const TERRITORY_RADIUS = 8;
+const SURPLUS_THRESHOLD = 10;
+const DEFICIT_THRESHOLD = 5;
+const MEMORY_DECAY_TICKS = 600;
+const PROXIMITY_SIGNAL_RANGE = 12;
+const PAWN_CARRY_CAPACITY = 5;
+
 // Define terrain types
 engine.tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
 engine.tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
@@ -47,6 +55,26 @@ engine.ecs.defineComponent('Hunger', { current: 0, max: 100, rate: 2 }); // rate
 engine.ecs.defineComponent('Food', { nutrition: 30 });
 engine.ecs.defineComponent('CurrentTask', { action: '', target: null as Entity | null });
 engine.ecs.defineComponent('AIState', { lastHungerPercent: 0, needsReeval: true });
+
+// Phase 6 components
+engine.ecs.defineComponent('Faction', { id: '' });
+engine.ecs.defineComponent('Inventory', { capacity: PAWN_CARRY_CAPACITY, food: 0 });
+engine.ecs.defineComponent('Stockpile', { factionId: '', food: 0 });
+engine.ecs.defineComponent('ColonyMemory', {
+  known: [] as Array<{
+    factionId: string;
+    stockpileX: number;
+    stockpileY: number;
+    lastSeenFood: number;
+    ticksSinceVisit: number;
+  }>,
+});
+engine.ecs.defineComponent('CaravanTask', {
+  targetFactionId: '',
+  targetStockpile: null as Entity | null,
+  phase: 'pickup' as 'pickup' | 'traveling-there' | 'dropoff' | 'returning',
+  homeStockpile: null as Entity | null,
+});
 
 function spawnFood(count: number): void {
   const halfW = Math.floor(engine.tileMap.width / 2);
