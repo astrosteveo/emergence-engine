@@ -101,6 +101,21 @@ function spawnFood(count: number): void {
   }
 }
 
+function spawnStockpile(tileX: number, tileY: number, factionId: string, initialFood: number): Entity {
+  const stockpile = engine.ecs.createEntity();
+  engine.ecs.addComponent(stockpile, 'Position', {
+    x: tileX * TILE_SIZE + TILE_SIZE / 2,
+    y: tileY * TILE_SIZE + TILE_SIZE / 2,
+  });
+  engine.ecs.addComponent(stockpile, 'Stockpile', { factionId, food: initialFood });
+  engine.ecs.addComponent(stockpile, 'Sprite', { width: 32, height: 32, color: factionId === 'red' ? '#dc2626' : '#2563eb' });
+
+  // Claim territory around stockpile
+  engine.tileMap.claimRadius(tileX, tileY, TERRITORY_RADIUS, factionId);
+
+  return stockpile;
+}
+
 // Spawn food items
 spawnFood(20);
 
