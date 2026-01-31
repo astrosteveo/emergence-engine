@@ -16,18 +16,16 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { ToolsPanel } from './ToolsPanel';
+import { TerrainPalette } from './TerrainPalette';
+import { BuildingPalette } from './BuildingPalette';
+
 export function Sidebar() {
   return (
-    <div className="w-64 bg-editor-surface border-r border-editor-border flex flex-col">
-      {/* Terrain/Building palette placeholder */}
-      <div className="p-3 border-b border-editor-border">
-        <h3 className="text-xs font-semibold text-editor-text-muted uppercase tracking-wider mb-2">
-          Tools
-        </h3>
-        <div className="text-sm text-editor-text-muted italic">
-          Tile painting tools coming in Phase 8
-        </div>
-      </div>
+    <div className="w-64 bg-editor-surface border-r border-editor-border flex flex-col overflow-y-auto">
+      <ToolsPanel />
+      <TerrainPalette />
+      <BuildingPalette />
 
       {/* Entity palette placeholder */}
       <div className="p-3 border-b border-editor-border flex-1">
