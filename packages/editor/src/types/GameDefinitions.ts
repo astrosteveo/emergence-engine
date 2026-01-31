@@ -1,5 +1,5 @@
 /*
- * This file is part of Colony.
+ * This file is part of Emergence Editor.
  * Copyright (C) 2026 astrosteveo
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,13 +16,22 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import type { EntityTemplate } from './templates';
 
-export default defineConfig({
-  plugins: [react()],
-  root: '.',
-  build: {
-    outDir: 'dist',
-  },
-});
+export interface TerrainDefinition {
+  name: string;
+  color: string;
+  label?: string;
+}
+
+export interface BuildingDefinition {
+  name: string;
+  color: string;
+  label?: string;
+}
+
+export interface GameDefinitions {
+  terrain: TerrainDefinition[];
+  buildings: BuildingDefinition[];
+  entityTemplates: EntityTemplate[];
+}

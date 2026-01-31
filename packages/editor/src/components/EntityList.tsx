@@ -20,8 +20,6 @@ import { useMemo } from 'react';
 import { useEditor } from '../hooks/useEditorContext';
 import { entityIndex } from 'emergence-engine';
 
-const TILE_SIZE = 16;
-
 export function EntityList() {
   const { engine, selectedEntityId, selectEntity } = useEditor();
 
@@ -41,13 +39,6 @@ export function EntityList() {
 
   const handleSelect = (entityId: number) => {
     selectEntity(entityId);
-    // Pan camera to entity
-    if (engine) {
-      const pos = engine.ecs.getComponent<{ x: number; y: number }>(entityId, 'Position');
-      if (pos) {
-        engine.camera.centerOn(pos.x * TILE_SIZE, pos.y * TILE_SIZE);
-      }
-    }
   };
 
   return (

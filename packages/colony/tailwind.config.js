@@ -16,13 +16,27 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  root: '.',
-  build: {
-    outDir: 'dist',
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        editor: {
+          bg: '#1a1a2e',
+          surface: '#16213e',
+          accent: '#0f3460',
+          border: '#2d3a52',
+          text: '#e8e8e8',
+          'text-muted': '#8892a8',
+          primary: '#4f46e5',
+          'primary-hover': '#4338ca',
+          success: '#22c55e',
+          warning: '#eab308',
+          error: '#ef4444',
+        },
+      },
+    },
   },
-});
+  plugins: [],
+};

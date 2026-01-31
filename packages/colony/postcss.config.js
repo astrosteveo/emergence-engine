@@ -16,13 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  root: '.',
-  build: {
-    outDir: 'dist',
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
   },
-});
+};

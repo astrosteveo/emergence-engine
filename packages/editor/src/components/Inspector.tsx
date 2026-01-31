@@ -129,7 +129,11 @@ export function Inspector() {
   const components = useMemo(() => {
     if (!engine || selectedEntityId === null) return null;
     if (!engine.ecs.isAlive(selectedEntityId)) return null;
-    return engine.ecs.getComponentsForEntity(selectedEntityId);
+    try {
+      return engine.ecs.getComponentsForEntity(selectedEntityId);
+    } catch {
+      return null;
+    }
   }, [engine, selectedEntityId]);
 
   const handleFieldChange = (componentName: string, field: string, value: unknown) => {

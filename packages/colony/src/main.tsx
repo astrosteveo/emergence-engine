@@ -16,13 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { EditorApp } from './EditorApp';
 
-export default defineConfig({
-  plugins: [react()],
-  root: '.',
-  build: {
-    outDir: 'dist',
-  },
-});
+const root = document.getElementById('root');
+if (!root) throw new Error('Root element not found');
+
+createRoot(root).render(
+  <StrictMode>
+    <EditorApp />
+  </StrictMode>
+);

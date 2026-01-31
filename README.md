@@ -258,7 +258,11 @@ packages/
 │
 └── colony/                 # Colony game (uses engine API)
     └── src/
-        └── main.ts         # Game entry point
+        ├── definitions.ts  # Game definitions for editor
+        ├── setup.ts        # Engine setup (components, systems, AI)
+        ├── render.ts       # Colony-specific rendering
+        ├── EditorApp.tsx   # React app integrating editor
+        └── main.tsx        # Entry point
 ```
 
 ## Roadmap
@@ -272,6 +276,7 @@ packages/
 - [x] Phase 7: Persistence & Editor Shell — Save/load, React editor UI
 - [x] Phase 8: Tile Painting — Paint terrain/buildings with brush tools
 - [x] Phase 9: Entity Placement — Place entities from templates, component inspector
+- [x] Phase 10: Play-in-Editor — Test games without leaving the browser, snapshot/restore
 
 ## License
 

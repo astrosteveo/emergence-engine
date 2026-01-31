@@ -19,9 +19,10 @@
 import { useEditor } from '../hooks/useEditorContext';
 
 export function TerrainPalette() {
-  const { engine, selectedTerrain, setSelectedTerrain, setTool } = useEditor();
+  const { engine, gameDefinitions, selectedTerrain, setSelectedTerrain, setTool } = useEditor();
 
-  const terrainDefs = engine?.tileMap.getAllTerrainDefs() ?? [];
+  // Prefer gameDefinitions if available, otherwise fall back to engine terrain defs
+  const terrainList = gameDefinitions?.terrain ?? engine?.tileMap.getAllTerrainDefs() ?? [];
 
   const handleSelect = (name: string) => {
     setSelectedTerrain(name);
@@ -34,7 +35,7 @@ export function TerrainPalette() {
         Terrain
       </h3>
       <div className="grid grid-cols-2 gap-1">
-        {terrainDefs.map((def) => (
+        {terrainList.map((def) => (
           <button
             key={def.name}
             className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
@@ -48,7 +49,7 @@ export function TerrainPalette() {
               className="w-4 h-4 rounded border border-editor-border"
               style={{ backgroundColor: def.color }}
             />
-            <span className="text-editor-text capitalize">{def.name}</span>
+            <span className="text-editor-text capitalize">{'label' in def ? def.label : def.name}</span>
           </button>
         ))}
       </div>

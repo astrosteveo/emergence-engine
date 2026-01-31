@@ -47,6 +47,7 @@ export function Viewport() {
     selectedEntityId,
     selectEntity,
     deleteSelectedEntity,
+    gameDefinitions,
   } = useEditor();
 
   // Painting state
@@ -55,8 +56,25 @@ export function Viewport() {
   const paintedTilesRef = useRef<Set<string>>(new Set());
   const [hoverTile, setHoverTile] = useState<{ x: number; y: number } | null>(null);
 
-  // Initialize engine
+  // MMB panning state
+  const isPanningRef = useRef(false);
+  const lastPanPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Handle external engine: switch to Viewport's canvas
   useEffect(() => {
+    if (!engine) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // If engine was created externally, switch it to use this canvas
+    engine.renderer.setCanvas(canvas);
+  }, [engine]);
+
+  // Initialize engine (only if not provided externally)
+  useEffect(() => {
+    // If engine already exists (external), skip initialization
+    if (engine) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -169,7 +187,7 @@ export function Viewport() {
     return () => {
       newEngine.stop();
     };
-  }, [setEngine, registerEntityTemplates]);
+  }, [engine, setEngine, registerEntityTemplates]);
 
   // Handle canvas resize
   useEffect(() => {
@@ -180,6 +198,8 @@ export function Viewport() {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
+        // Skip if dimensions are invalid (can happen during layout transitions)
+        if (width <= 0 || height <= 0) continue;
         canvas.width = width;
         canvas.height = height;
         // Update renderer/camera with new dimensions
@@ -271,8 +291,13 @@ export function Viewport() {
       const entities = engine.ecs.getAllEntities();
       for (const entity of entities) {
         const pos = engine.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
-        if (pos && pos.x === tileX && pos.y === tileY) {
-          return entity;
+        // Check if entity's world position falls within this tile
+        if (pos) {
+          const entityTileX = Math.floor(pos.x / TILE_SIZE);
+          const entityTileY = Math.floor(pos.y / TILE_SIZE);
+          if (entityTileX === tileX && entityTileY === tileY) {
+            return entity;
+          }
         }
       }
       return null;
@@ -284,16 +309,18 @@ export function Viewport() {
   const spawnEntity = useCallback(
     (tileX: number, tileY: number) => {
       if (!engine || !selectedTemplate) return;
-      const template = entityTemplates.find((t) => t.name === selectedTemplate);
+      // Prefer gameDefinitions templates over internally registered ones
+      const templates = gameDefinitions?.entityTemplates ?? entityTemplates;
+      const template = templates.find((t) => t.name === selectedTemplate);
       if (!template) return;
 
       const entity = engine.ecs.createEntity();
       for (const comp of template.components) {
         const data = { ...comp.defaults };
-        // Override position with click location
+        // Override position with click location (convert to world coordinates)
         if (comp.type === 'Position') {
-          data.x = tileX;
-          data.y = tileY;
+          data.x = tileX * TILE_SIZE;
+          data.y = tileY * TILE_SIZE;
         }
         try {
           engine.ecs.addComponent(entity, comp.type, data);
@@ -304,18 +331,29 @@ export function Viewport() {
       setProject({ modified: true });
       selectEntity(entity);
     },
-    [engine, entityTemplates, selectedTemplate, setProject, selectEntity]
+    [engine, gameDefinitions, entityTemplates, selectedTemplate, setProject, selectEntity]
   );
 
-  // Mouse down: start painting or handle entity placement/selection
+  // Mouse down: start painting, panning, or handle entity placement/selection
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!engine || mode !== 'edit') return;
-      if (e.button !== 0 && e.button !== 2) return; // Only left or right click
+      if (!engine) return;
 
       const rect = e.currentTarget.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
+
+      // Middle mouse button: start panning
+      if (e.button === 1) {
+        e.preventDefault();
+        isPanningRef.current = true;
+        lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      if (mode !== 'edit') return;
+      if (e.button !== 0 && e.button !== 2) return; // Only left or right click for painting
+
       const worldPos = engine.camera.screenToWorld(screenX, screenY);
       const tilePos = engine.camera.worldToTile(worldPos.x, worldPos.y, TILE_SIZE);
 
@@ -366,10 +404,19 @@ export function Viewport() {
     [engine, mode, tool, brushSize, brushShape, captureTileState, paintBrush, getEntityAtTile, selectEntity, selectedTemplate, spawnEntity]
   );
 
-  // Mouse move: continue painting if dragging
+  // Mouse move: continue painting or panning if dragging
   const handleMouseMovePaint = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!engine) return;
+
+      // Handle MMB panning
+      if (isPanningRef.current && lastPanPosRef.current) {
+        const dx = e.clientX - lastPanPosRef.current.x;
+        const dy = e.clientY - lastPanPosRef.current.y;
+        engine.camera.pan(-dx, -dy);
+        lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
 
       const rect = e.currentTarget.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
@@ -411,18 +458,26 @@ export function Viewport() {
     [engine, mode, brushSize, brushShape, captureTileState, paintBrush, setMouseWorldPos]
   );
 
-  // Mouse up: commit stroke
+  // Mouse up: commit stroke or stop panning
   const handleMouseUp = useCallback(() => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      lastPanPosRef.current = null;
+    }
     if (isPaintingRef.current) {
       isPaintingRef.current = false;
       commitStroke();
     }
   }, [commitStroke]);
 
-  // Mouse leave: commit stroke and clear hover
+  // Mouse leave: commit stroke, stop panning, and clear hover
   const handleMouseLeavePaint = useCallback(() => {
     setMouseWorldPos(null);
     setHoverTile(null);
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      lastPanPosRef.current = null;
+    }
     if (isPaintingRef.current) {
       isPaintingRef.current = false;
       commitStroke();
@@ -460,8 +515,6 @@ export function Viewport() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-
-      const panSpeed = 16;
 
       // Undo/Redo
       if (e.ctrlKey || e.metaKey) {
@@ -523,30 +576,6 @@ export function Viewport() {
           return;
         }
       }
-
-      // Camera panning
-      switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-          engine.camera.pan(0, -panSpeed);
-          setProject({ modified: true });
-          break;
-        case 'ArrowDown':
-        case 's':
-          engine.camera.pan(0, panSpeed);
-          setProject({ modified: true });
-          break;
-        case 'ArrowLeft':
-        case 'a':
-          engine.camera.pan(-panSpeed, 0);
-          setProject({ modified: true });
-          break;
-        case 'ArrowRight':
-        case 'd':
-          engine.camera.pan(panSpeed, 0);
-          setProject({ modified: true });
-          break;
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -569,7 +598,10 @@ export function Viewport() {
       if (selectedEntityId !== null && engine.ecs.isAlive(selectedEntityId)) {
         const pos = engine.ecs.getComponent<{ x: number; y: number }>(selectedEntityId, 'Position');
         if (pos) {
-          const screenPos = camera.worldToScreen(pos.x * TILE_SIZE, pos.y * TILE_SIZE);
+          // Position stores world coordinates, convert to tile for alignment
+          const tileX = Math.floor(pos.x / TILE_SIZE);
+          const tileY = Math.floor(pos.y / TILE_SIZE);
+          const screenPos = camera.worldToScreen(tileX * TILE_SIZE, tileY * TILE_SIZE);
           const size = TILE_SIZE * camera.zoom;
           renderer.strokeRectScreen(screenPos.x, screenPos.y, size, size, '#fbbf24');
         }
