@@ -56,6 +56,16 @@ export class GameLoop {
     this.running = false;
   }
 
+  /**
+   * Executes all draw callbacks once without running the simulation.
+   * Useful for rendering in edit mode when the game loop is stopped.
+   */
+  drawOnce(): void {
+    for (const callback of this.drawCallbacks) {
+      callback();
+    }
+  }
+
   private loop(currentTime: number): void {
     if (!this.running) return;
 

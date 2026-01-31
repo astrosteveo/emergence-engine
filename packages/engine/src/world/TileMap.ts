@@ -185,4 +185,74 @@ export class TileMap {
 
     return true;
   }
+
+  // ============================================
+  // Serialization accessors
+  // ============================================
+
+  /**
+   * Returns the raw terrain data array as a copy.
+   * Returns null if the map has not been created.
+   */
+  getRawTerrainData(): Uint8Array | null {
+    return this.terrainData ? new Uint8Array(this.terrainData) : null;
+  }
+
+  /**
+   * Returns the raw building data array as a copy.
+   * Returns null if the map has not been created.
+   */
+  getRawBuildingData(): Uint8Array | null {
+    return this.buildingData ? new Uint8Array(this.buildingData) : null;
+  }
+
+  /**
+   * Returns all defined terrain types.
+   */
+  getAllTerrainDefs(): TerrainDef[] {
+    return Array.from(this.terrainDefs.values());
+  }
+
+  /**
+   * Returns all defined building types.
+   */
+  getAllBuildingDefs(): BuildingDef[] {
+    return Array.from(this.buildingDefs.values());
+  }
+
+  /**
+   * Returns all territory assignments as [index, factionId] pairs.
+   */
+  getAllTerritory(): [number, string][] {
+    return Array.from(this.territoryData.entries());
+  }
+
+  /**
+   * Loads map data from serialized state.
+   * Terrain and building definitions must already be registered.
+   */
+  loadFromData(
+    width: number,
+    height: number,
+    terrainData: Uint8Array,
+    buildingData: Uint8Array,
+    territory: [number, string][]
+  ): void {
+    if (terrainData.length !== width * height) {
+      throw new Error(`Terrain data length mismatch: expected ${width * height}, got ${terrainData.length}`);
+    }
+    if (buildingData.length !== width * height) {
+      throw new Error(`Building data length mismatch: expected ${width * height}, got ${buildingData.length}`);
+    }
+
+    this._width = width;
+    this._height = height;
+    this.terrainData = new Uint8Array(terrainData);
+    this.buildingData = new Uint8Array(buildingData);
+
+    this.territoryData.clear();
+    for (const [index, factionId] of territory) {
+      this.territoryData.set(index, factionId);
+    }
+  }
 }

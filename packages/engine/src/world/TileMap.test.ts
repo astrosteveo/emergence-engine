@@ -315,4 +315,164 @@ describe('TileMap', () => {
       expect(map.getTerritory(100, 100)).toBeNull();
     });
   });
+
+  describe('serialization', () => {
+    it('should return null for raw data before map is created', () => {
+      const map = new TileMap();
+
+      expect(map.getRawTerrainData()).toBeNull();
+      expect(map.getRawBuildingData()).toBeNull();
+    });
+
+    it('should return copies of raw terrain and building data', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.defineTerrain('water', { color: '#1d3557', walkable: false });
+      map.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      map.create(4, 4, 'grass');
+
+      map.setTerrain(0, 0, 'water');
+      map.setBuilding(1, 0, 'wall');
+
+      const terrainData = map.getRawTerrainData();
+      const buildingData = map.getRawBuildingData();
+
+      expect(terrainData).not.toBeNull();
+      expect(buildingData).not.toBeNull();
+      expect(terrainData!.length).toBe(16);
+      expect(buildingData!.length).toBe(16);
+
+      // Verify it's a copy by modifying and checking original is unchanged
+      terrainData![0] = 255;
+      expect(map.getRawTerrainData()![0]).not.toBe(255);
+    });
+
+    it('should return all terrain definitions', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.defineTerrain('water', { color: '#1d3557', walkable: false });
+
+      const defs = map.getAllTerrainDefs();
+
+      expect(defs).toHaveLength(2);
+      expect(defs.find(d => d.name === 'grass')).toBeDefined();
+      expect(defs.find(d => d.name === 'water')).toBeDefined();
+    });
+
+    it('should return all building definitions', () => {
+      const map = new TileMap();
+      map.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      map.defineBuilding('floor', { color: '#8b7355', solid: false });
+
+      const defs = map.getAllBuildingDefs();
+
+      expect(defs).toHaveLength(2);
+      expect(defs.find(d => d.name === 'wall')).toBeDefined();
+      expect(defs.find(d => d.name === 'floor')).toBeDefined();
+    });
+
+    it('should return all territory assignments', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.create(10, 10, 'grass');
+
+      map.setTerritory(0, 0, 'red');
+      map.setTerritory(1, 0, 'blue');
+
+      const territory = map.getAllTerritory();
+
+      expect(territory.length).toBe(2);
+      expect(territory.some(([_, faction]) => faction === 'red')).toBe(true);
+      expect(territory.some(([_, faction]) => faction === 'blue')).toBe(true);
+    });
+
+    it('should load from serialized data', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.defineTerrain('water', { color: '#1d3557', walkable: false });
+      map.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+
+      // Create terrain data: 4x4 grid, mostly grass (id=1), one water (id=2)
+      const terrainData = new Uint8Array(16);
+      terrainData.fill(1);
+      terrainData[0] = 2; // Water at index 0
+
+      // Create building data: one wall
+      const buildingData = new Uint8Array(16);
+      buildingData[1] = 1; // Wall at index 1
+
+      // Territory data
+      const territory: [number, string][] = [[5, 'red'], [6, 'blue']];
+
+      map.loadFromData(4, 4, terrainData, buildingData, territory);
+
+      expect(map.width).toBe(4);
+      expect(map.height).toBe(4);
+      expect(map.getTerrain(-2, -2)?.name).toBe('water'); // Index 0
+      expect(map.getTerrain(-1, -2)?.name).toBe('grass'); // Index 1
+      expect(map.getBuilding(-1, -2)?.name).toBe('wall'); // Index 1
+    });
+
+    it('should round-trip serialize/deserialize correctly', () => {
+      // Create and populate a map
+      const original = new TileMap();
+      original.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      original.defineTerrain('water', { color: '#1d3557', walkable: false });
+      original.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+      original.create(8, 8, 'grass');
+
+      original.setTerrain(0, 0, 'water');
+      original.setTerrain(1, 1, 'water');
+      original.setBuilding(2, 2, 'wall');
+      original.setTerritory(0, 0, 'red');
+      original.setTerritory(-1, -1, 'blue');
+
+      // Serialize
+      const terrainData = original.getRawTerrainData()!;
+      const buildingData = original.getRawBuildingData()!;
+      const territory = original.getAllTerritory();
+
+      // Create new map with same definitions
+      const restored = new TileMap();
+      restored.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      restored.defineTerrain('water', { color: '#1d3557', walkable: false });
+      restored.defineBuilding('wall', { color: '#4a4a4a', solid: true });
+
+      // Deserialize
+      restored.loadFromData(8, 8, terrainData, buildingData, territory);
+
+      // Verify
+      expect(restored.width).toBe(original.width);
+      expect(restored.height).toBe(original.height);
+      expect(restored.getTerrain(0, 0)?.name).toBe('water');
+      expect(restored.getTerrain(1, 1)?.name).toBe('water');
+      expect(restored.getTerrain(2, 0)?.name).toBe('grass');
+      expect(restored.getBuilding(2, 2)?.name).toBe('wall');
+      expect(restored.getBuilding(0, 0)).toBeUndefined();
+      expect(restored.getTerritory(0, 0)).toBe('red');
+      expect(restored.getTerritory(-1, -1)).toBe('blue');
+    });
+
+    it('should throw on terrain data length mismatch', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+
+      const terrainData = new Uint8Array(10); // Wrong size
+      const buildingData = new Uint8Array(16);
+
+      expect(() => map.loadFromData(4, 4, terrainData, buildingData, []))
+        .toThrow('Terrain data length mismatch');
+    });
+
+    it('should throw on building data length mismatch', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+
+      const terrainData = new Uint8Array(16);
+      const buildingData = new Uint8Array(10); // Wrong size
+
+      expect(() => map.loadFromData(4, 4, terrainData, buildingData, []))
+        .toThrow('Building data length mismatch');
+    });
+  });
 });

@@ -16,31 +16,59 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+export interface CameraState {
+  x: number;
+  y: number;
+  zoomLevel: number;
+}
+
 export class Camera {
   private static readonly ZOOM_LEVELS = [1, 2, 4];
-  private zoomLevel = 0;
+  private _zoomLevel = 0;
+  private _viewportWidth: number;
+  private _viewportHeight: number;
   x = 0;
   y = 0;
 
-  constructor(
-    readonly viewportWidth: number,
-    readonly viewportHeight: number
-  ) {}
+  constructor(viewportWidth: number, viewportHeight: number) {
+    this._viewportWidth = viewportWidth;
+    this._viewportHeight = viewportHeight;
+  }
+
+  get viewportWidth(): number {
+    return this._viewportWidth;
+  }
+
+  get viewportHeight(): number {
+    return this._viewportHeight;
+  }
+
+  /**
+   * Updates the viewport dimensions. Call this when the canvas is resized.
+   */
+  resize(width: number, height: number): void {
+    this._viewportWidth = width;
+    this._viewportHeight = height;
+  }
 
   get zoom(): number {
-    return Camera.ZOOM_LEVELS[this.zoomLevel];
+    return Camera.ZOOM_LEVELS[this._zoomLevel];
+  }
+
+  get zoomLevel(): number {
+    return this._zoomLevel;
   }
 
   zoomIn(): void {
-    this.zoomLevel = Math.min(this.zoomLevel + 1, Camera.ZOOM_LEVELS.length - 1);
+    this._zoomLevel = Math.min(this._zoomLevel + 1, Camera.ZOOM_LEVELS.length - 1);
   }
 
   zoomOut(): void {
-    this.zoomLevel = Math.max(this.zoomLevel - 1, 0);
+    this._zoomLevel = Math.max(this._zoomLevel - 1, 0);
   }
 
   setZoomLevel(level: number): void {
-    this.zoomLevel = Math.max(0, Math.min(level, Camera.ZOOM_LEVELS.length - 1));
+    this._zoomLevel = Math.max(0, Math.min(level, Camera.ZOOM_LEVELS.length - 1));
   }
 
   pan(dx: number, dy: number): void {
@@ -94,5 +122,29 @@ export class Camera {
       minY: Math.floor(worldMinY / tileSize) - 1,
       maxY: Math.ceil(worldMaxY / tileSize) + 1,
     };
+  }
+
+  // ============================================
+  // Serialization accessors
+  // ============================================
+
+  /**
+   * Returns the current camera state for serialization.
+   */
+  getState(): CameraState {
+    return {
+      x: this.x,
+      y: this.y,
+      zoomLevel: this._zoomLevel,
+    };
+  }
+
+  /**
+   * Restores camera state from serialized data.
+   */
+  setState(state: CameraState): void {
+    this.x = state.x;
+    this.y = state.y;
+    this._zoomLevel = Math.max(0, Math.min(state.zoomLevel, Camera.ZOOM_LEVELS.length - 1));
   }
 }

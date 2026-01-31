@@ -359,4 +359,184 @@ describe('World', () => {
       expect(pos).toEqual({ x: 10, y: 5 });
     });
   });
+
+  describe('serialization', () => {
+    it('should return all alive entities', () => {
+      const world = new World();
+      const e1 = world.createEntity();
+      const e2 = world.createEntity();
+      const e3 = world.createEntity();
+      world.destroyEntity(e2);
+
+      const all = world.getAllEntities();
+
+      expect(all).toContain(e1);
+      expect(all).not.toContain(e2);
+      expect(all).toContain(e3);
+      expect(all).toHaveLength(2);
+    });
+
+    it('should get all components for an entity', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      world.defineComponent('Velocity', { vx: 0, vy: 0 });
+      world.defineComponent('Name', { value: '' });
+
+      const entity = world.createEntity();
+      world.addComponent(entity, 'Position', { x: 10, y: 20 });
+      world.addComponent(entity, 'Velocity', { vx: 1, vy: 2 });
+      // Not adding Name component
+
+      const components = world.getComponentsForEntity(entity);
+
+      expect(components['Position']).toEqual({ x: 10, y: 20 });
+      expect(components['Velocity']).toEqual({ vx: 1, vy: 2 });
+      expect(components['Name']).toBeUndefined();
+    });
+
+    it('should return empty object for dead entity', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      const entity = world.createEntity();
+      world.addComponent(entity, 'Position');
+      world.destroyEntity(entity);
+
+      const components = world.getComponentsForEntity(entity);
+
+      expect(components).toEqual({});
+    });
+
+    it('should return all component definitions', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      world.defineComponent('Velocity', { vx: 0, vy: 0 });
+
+      const defs = world.getAllComponentDefs();
+
+      expect(defs).toHaveLength(2);
+      expect(defs.find(d => d.name === 'Position')).toEqual({ name: 'Position', defaults: { x: 0, y: 0 } });
+      expect(defs.find(d => d.name === 'Velocity')).toEqual({ name: 'Velocity', defaults: { vx: 0, vy: 0 } });
+    });
+
+    it('should load entities with preserved IDs', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+      world.defineComponent('Name', { value: '' });
+
+      // Simulate loading entities with specific IDs
+      // Entity ID format: (generation << 20) | index
+      const entity1 = (0 << 20) | 5;  // Index 5, generation 0
+      const entity2 = (2 << 20) | 10; // Index 10, generation 2
+
+      world.loadEntities([
+        { id: entity1, components: { Position: { x: 100, y: 200 }, Name: { value: 'Entity1' } } },
+        { id: entity2, components: { Position: { x: 300, y: 400 } } },
+      ]);
+
+      expect(world.isAlive(entity1)).toBe(true);
+      expect(world.isAlive(entity2)).toBe(true);
+      expect(world.getComponent(entity1, 'Position')).toEqual({ x: 100, y: 200 });
+      expect(world.getComponent(entity1, 'Name')).toEqual({ value: 'Entity1' });
+      expect(world.getComponent(entity2, 'Position')).toEqual({ x: 300, y: 400 });
+      expect(world.hasComponent(entity2, 'Name')).toBe(false);
+    });
+
+    it('should round-trip serialize/deserialize entities', () => {
+      // Create world with entities
+      const original = new World();
+      original.defineComponent('Position', { x: 0, y: 0 });
+      original.defineComponent('Tag', { value: '' });
+
+      const e1 = original.createEntity();
+      original.addComponent(e1, 'Position', { x: 10, y: 20 });
+      original.addComponent(e1, 'Tag', { value: 'player' });
+
+      const e2 = original.createEntity();
+      original.addComponent(e2, 'Position', { x: 30, y: 40 });
+
+      // Create dead entity to test gap handling
+      const e3 = original.createEntity();
+      original.destroyEntity(e3);
+
+      const e4 = original.createEntity();
+      original.addComponent(e4, 'Position', { x: 50, y: 60 });
+
+      // Serialize
+      const serialized = original.getAllEntities().map(entity => ({
+        id: entity,
+        components: original.getComponentsForEntity(entity),
+      }));
+
+      // Create new world and load
+      const restored = new World();
+      restored.defineComponent('Position', { x: 0, y: 0 });
+      restored.defineComponent('Tag', { value: '' });
+      restored.loadEntities(serialized);
+
+      // Verify
+      expect(restored.isAlive(e1)).toBe(true);
+      expect(restored.isAlive(e2)).toBe(true);
+      expect(restored.isAlive(e3)).toBe(false);
+      expect(restored.isAlive(e4)).toBe(true);
+      expect(restored.getComponent(e1, 'Position')).toEqual({ x: 10, y: 20 });
+      expect(restored.getComponent(e1, 'Tag')).toEqual({ value: 'player' });
+      expect(restored.getComponent(e2, 'Position')).toEqual({ x: 30, y: 40 });
+      expect(restored.getComponent(e4, 'Position')).toEqual({ x: 50, y: 60 });
+    });
+
+    it('should clear all entities but keep component definitions', () => {
+      const world = new World();
+      world.defineComponent('Position', { x: 0, y: 0 });
+
+      const e1 = world.createEntity();
+      world.addComponent(e1, 'Position', { x: 10, y: 20 });
+      const e2 = world.createEntity();
+      world.addComponent(e2, 'Position', { x: 30, y: 40 });
+
+      world.clear();
+
+      expect(world.getAllEntities()).toHaveLength(0);
+      expect(world.isAlive(e1)).toBe(false);
+      expect(world.isAlive(e2)).toBe(false);
+
+      // Should still be able to create new entities and use defined components
+      const e3 = world.createEntity();
+      world.addComponent(e3, 'Position', { x: 50, y: 60 });
+      expect(world.isAlive(e3)).toBe(true);
+      expect(world.getComponent(e3, 'Position')).toEqual({ x: 50, y: 60 });
+    });
+
+    it('should preserve entity references across serialization', () => {
+      // Test that entity A referencing entity B works after load
+      const original = new World();
+      original.defineComponent('Position', { x: 0, y: 0 });
+      original.defineComponent('Target', { entityRef: 0 });
+
+      const target = original.createEntity();
+      original.addComponent(target, 'Position', { x: 100, y: 100 });
+
+      const follower = original.createEntity();
+      original.addComponent(follower, 'Position', { x: 0, y: 0 });
+      original.addComponent(follower, 'Target', { entityRef: target });
+
+      // Serialize
+      const serialized = original.getAllEntities().map(entity => ({
+        id: entity,
+        components: original.getComponentsForEntity(entity),
+      }));
+
+      // Load into new world
+      const restored = new World();
+      restored.defineComponent('Position', { x: 0, y: 0 });
+      restored.defineComponent('Target', { entityRef: 0 });
+      restored.loadEntities(serialized);
+
+      // Verify the reference is preserved
+      const restoredFollower = serialized.find(e => restored.hasComponent(e.id, 'Target'))!.id;
+      const restoredTargetRef = restored.getComponent<{ entityRef: number }>(restoredFollower, 'Target')!.entityRef;
+
+      expect(restored.isAlive(restoredTargetRef)).toBe(true);
+      expect(restored.getComponent(restoredTargetRef, 'Position')).toEqual({ x: 100, y: 100 });
+    });
+  });
 });

@@ -257,4 +257,95 @@ describe('Camera', () => {
       expect(width2x).toBeLessThan(width1x);
     });
   });
+
+  describe('serialization', () => {
+    it('should return current state', () => {
+      const camera = new Camera(800, 600);
+      camera.pan(100, 200);
+      camera.zoomIn();
+
+      const state = camera.getState();
+
+      expect(state.x).toBe(100);
+      expect(state.y).toBe(200);
+      expect(state.zoomLevel).toBe(1); // Index 1 = 2x zoom
+    });
+
+    it('should restore state from saved data', () => {
+      const camera = new Camera(800, 600);
+
+      camera.setState({ x: 50, y: 75, zoomLevel: 2 });
+
+      expect(camera.x).toBe(50);
+      expect(camera.y).toBe(75);
+      expect(camera.zoom).toBe(4); // Level 2 = 4x zoom
+    });
+
+    it('should clamp invalid zoom levels when restoring', () => {
+      const camera = new Camera(800, 600);
+
+      camera.setState({ x: 0, y: 0, zoomLevel: 10 });
+      expect(camera.zoom).toBe(4); // Max level
+
+      camera.setState({ x: 0, y: 0, zoomLevel: -5 });
+      expect(camera.zoom).toBe(1); // Min level
+    });
+
+    it('should round-trip state correctly', () => {
+      const camera1 = new Camera(800, 600);
+      camera1.pan(123, 456);
+      camera1.zoomIn();
+      camera1.zoomIn();
+
+      const state = camera1.getState();
+
+      const camera2 = new Camera(800, 600);
+      camera2.setState(state);
+
+      expect(camera2.x).toBe(camera1.x);
+      expect(camera2.y).toBe(camera1.y);
+      expect(camera2.zoom).toBe(camera1.zoom);
+    });
+
+    it('should expose zoom level getter', () => {
+      const camera = new Camera(800, 600);
+
+      expect(camera.zoomLevel).toBe(0);
+
+      camera.zoomIn();
+      expect(camera.zoomLevel).toBe(1);
+
+      camera.zoomIn();
+      expect(camera.zoomLevel).toBe(2);
+    });
+  });
+
+  describe('resize', () => {
+    it('should update viewport dimensions', () => {
+      const camera = new Camera(800, 600);
+
+      expect(camera.viewportWidth).toBe(800);
+      expect(camera.viewportHeight).toBe(600);
+
+      camera.resize(1024, 768);
+
+      expect(camera.viewportWidth).toBe(1024);
+      expect(camera.viewportHeight).toBe(768);
+    });
+
+    it('should affect coordinate transforms after resize', () => {
+      const camera = new Camera(800, 600);
+
+      // Screen center should map to world origin
+      let world = camera.screenToWorld(400, 300);
+      expect(world.x).toBe(0);
+      expect(world.y).toBe(0);
+
+      // After resize, new screen center should map to world origin
+      camera.resize(1024, 768);
+      world = camera.screenToWorld(512, 384);
+      expect(world.x).toBe(0);
+      expect(world.y).toBe(0);
+    });
+  });
 });
