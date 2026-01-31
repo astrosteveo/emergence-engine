@@ -279,6 +279,22 @@ engine.ecs.addSystem({
   },
 });
 
+// Memory decay system: increment ticksSinceVisit for all known colonies
+engine.ecs.addSystem({
+  name: 'MemoryDecay',
+  query: ['ColonyMemory'],
+  update(entities) {
+    for (const e of entities) {
+      const memory = engine.ecs.getComponent<{
+        known: Array<{ ticksSinceVisit: number }>;
+      }>(e, 'ColonyMemory')!;
+      for (const entry of memory.known) {
+        entry.ticksSinceVisit++;
+      }
+    }
+  },
+});
+
 // AI Decision system: re-evaluate when needed
 engine.ecs.addSystem({
   name: 'AIDecision',
