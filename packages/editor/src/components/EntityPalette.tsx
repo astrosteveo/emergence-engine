@@ -19,9 +19,12 @@
 import { useEditor } from '../hooks/useEditorContext';
 
 export function EntityPalette() {
-  const { entityTemplates, selectedTemplate, selectTemplate, tool } = useEditor();
+  const { gameDefinitions, entityTemplates, selectedTemplate, selectTemplate, tool } = useEditor();
 
-  if (entityTemplates.length === 0) {
+  // Prefer gameDefinitions templates over internally registered ones
+  const templates = gameDefinitions?.entityTemplates ?? entityTemplates;
+
+  if (templates.length === 0) {
     return (
       <div className="p-3 border-b border-editor-border">
         <h3 className="text-xs font-semibold text-editor-text-muted uppercase tracking-wider mb-2">
@@ -40,7 +43,7 @@ export function EntityPalette() {
         Entities
       </h3>
       <div className="grid grid-cols-2 gap-1">
-        {entityTemplates.map((template) => (
+        {templates.map((template) => (
           <button
             key={template.name}
             className={`px-2 py-1.5 text-xs rounded text-left transition-colors ${

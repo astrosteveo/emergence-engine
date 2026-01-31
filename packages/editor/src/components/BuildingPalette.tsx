@@ -19,9 +19,10 @@
 import { useEditor } from '../hooks/useEditorContext';
 
 export function BuildingPalette() {
-  const { engine, selectedBuilding, setSelectedBuilding, setTool } = useEditor();
+  const { engine, gameDefinitions, selectedBuilding, setSelectedBuilding, setTool } = useEditor();
 
-  const buildingDefs = engine?.tileMap.getAllBuildingDefs() ?? [];
+  // Prefer gameDefinitions if available, otherwise fall back to engine building defs
+  const buildingList = gameDefinitions?.buildings ?? engine?.tileMap.getAllBuildingDefs() ?? [];
 
   const handleSelect = (name: string) => {
     setSelectedBuilding(name);
@@ -34,7 +35,7 @@ export function BuildingPalette() {
         Buildings
       </h3>
       <div className="grid grid-cols-2 gap-1">
-        {buildingDefs.map((def) => (
+        {buildingList.map((def) => (
           <button
             key={def.name}
             className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
@@ -48,7 +49,7 @@ export function BuildingPalette() {
               className="w-4 h-4 rounded border border-editor-border"
               style={{ backgroundColor: def.color }}
             />
-            <span className="text-editor-text capitalize">{def.name}</span>
+            <span className="text-editor-text capitalize">{'label' in def ? def.label : def.name}</span>
           </button>
         ))}
       </div>
