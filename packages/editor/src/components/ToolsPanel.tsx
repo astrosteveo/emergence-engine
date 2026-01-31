@@ -31,7 +31,7 @@ export function ToolsPanel() {
         Tools
       </h3>
 
-      {/* Paint/Erase toggle */}
+      {/* Mode toggle */}
       <div className="mb-3">
         <label className="text-xs text-editor-text-muted mb-1 block">Mode</label>
         <div className="flex gap-1">
@@ -42,6 +42,7 @@ export function ToolsPanel() {
                 : 'bg-editor-accent text-editor-text hover:bg-editor-border'
             }`}
             onClick={() => setTool('paint')}
+            title="Paint (P)"
           >
             Paint
           </button>
@@ -52,8 +53,20 @@ export function ToolsPanel() {
                 : 'bg-editor-accent text-editor-text hover:bg-editor-border'
             }`}
             onClick={() => setTool('erase')}
+            title="Erase (X)"
           >
             Erase
+          </button>
+          <button
+            className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
+              tool === 'entity'
+                ? 'bg-editor-primary text-white'
+                : 'bg-editor-accent text-editor-text hover:bg-editor-border'
+            }`}
+            onClick={() => setTool('entity')}
+            title="Entity (E)"
+          >
+            Entity
           </button>
         </div>
       </div>
