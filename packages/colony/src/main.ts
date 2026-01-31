@@ -318,6 +318,64 @@ engine.ai.defineAction('wander', {
   },
 });
 
+engine.ai.defineAction('explore', {
+  canExecute() {
+    return true;
+  },
+  score() {
+    return 0.15; // Slightly higher than wander (0.1)
+  },
+  execute(entity, context) {
+    const pos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!pos) return;
+
+    const currentTileX = Math.floor(pos.x / TILE_SIZE);
+    const currentTileY = Math.floor(pos.y / TILE_SIZE);
+
+    // Explore toward the opposite side of the map (toward other colony)
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    const direction = faction?.id === 'red' ? 1 : -1; // Red goes right, blue goes left
+
+    // Pick a random tile biased toward the other colony's direction
+    const range = 10;
+    let targetX = currentTileX;
+    let targetY = currentTileY;
+    let found = false;
+
+    for (let attempts = 0; attempts < 15 && !found; attempts++) {
+      const dx = Math.floor(Math.random() * range) * direction + Math.floor(Math.random() * 5) - 2;
+      const dy = Math.floor(Math.random() * 11) - 5;
+      const tx = currentTileX + dx;
+      const ty = currentTileY + dy;
+
+      if (engine.tileMap.isWalkable(tx, ty)) {
+        const path = pathfinder.findPath(currentTileX, currentTileY, tx, ty);
+        if (path) {
+          targetX = tx;
+          targetY = ty;
+          found = true;
+        }
+      }
+    }
+
+    if (!found) return;
+
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+
+    context.ecs.addComponent(entity, 'PathTarget', { x: targetX, y: targetY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'explore', target: null });
+  },
+});
+
 function findHomeStockpile(pawnEntity: Entity): Entity | null {
   const faction = engine.ecs.getComponent<{ id: string }>(pawnEntity, 'Faction');
   if (!faction) return null;
