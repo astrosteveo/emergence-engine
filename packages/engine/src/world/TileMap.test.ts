@@ -261,4 +261,58 @@ describe('TileMap', () => {
       expect(tileMap.isWalkable(100, 100)).toBe(false);
     });
   });
+
+  describe('territory', () => {
+    it('returns null for tiles with no territory', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.create(10, 10, 'grass');
+
+      expect(map.getTerritory(0, 0)).toBeNull();
+    });
+
+    it('stores and retrieves territory faction id', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.create(10, 10, 'grass');
+
+      map.setTerritory(0, 0, 'red');
+      expect(map.getTerritory(0, 0)).toBe('red');
+    });
+
+    it('clears territory', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.create(10, 10, 'grass');
+
+      map.setTerritory(0, 0, 'red');
+      map.clearTerritory(0, 0);
+      expect(map.getTerritory(0, 0)).toBeNull();
+    });
+
+    it('claims radius around a point', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.create(20, 20, 'grass');
+
+      map.claimRadius(0, 0, 2, 'blue');
+
+      // Center and adjacent tiles should be claimed
+      expect(map.getTerritory(0, 0)).toBe('blue');
+      expect(map.getTerritory(1, 0)).toBe('blue');
+      expect(map.getTerritory(0, 1)).toBe('blue');
+      expect(map.getTerritory(2, 0)).toBe('blue');
+
+      // Outside radius should not be claimed
+      expect(map.getTerritory(3, 0)).toBeNull();
+    });
+
+    it('returns null for out of bounds territory queries', () => {
+      const map = new TileMap();
+      map.defineTerrain('grass', { color: '#3a5a40', walkable: true });
+      map.create(10, 10, 'grass');
+
+      expect(map.getTerritory(100, 100)).toBeNull();
+    });
+  });
 });
