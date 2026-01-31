@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { entityIndex } from 'emergence-engine';
 import { useEditor } from '../hooks/useEditorContext';
 
 export function StatusBar() {
@@ -28,6 +29,9 @@ export function StatusBar() {
     brushShape,
     selectedTerrain,
     selectedBuilding,
+    selectedTemplate,
+    selectedEntityId,
+    entityTemplates,
   } = useEditor();
 
   const tilePos =
@@ -40,6 +44,13 @@ export function StatusBar() {
 
   // Build brush info string
   const getBrushInfo = () => {
+    if (tool === 'entity') {
+      if (selectedTemplate) {
+        const template = entityTemplates.find((t) => t.name === selectedTemplate);
+        return `Entity: ${template?.label ?? selectedTemplate}`;
+      }
+      return 'Entity: None selected';
+    }
     if (tool === 'erase') {
       return `Eraser ${brushSize}x${brushSize} ${brushShape}`;
     }
@@ -61,6 +72,13 @@ export function StatusBar() {
 
       {/* Brush info */}
       <div className="text-editor-text">{getBrushInfo()}</div>
+
+      {/* Selection info */}
+      {selectedEntityId !== null && (
+        <div className="text-editor-text">
+          Selected: #{entityIndex(selectedEntityId)}
+        </div>
+      )}
 
       {/* Tile coordinates */}
       <div>
