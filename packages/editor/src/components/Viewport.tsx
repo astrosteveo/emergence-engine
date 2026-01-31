@@ -41,6 +41,10 @@ export function Viewport() {
     selectedTerrain,
     selectedBuilding,
     undoActions,
+    entityTemplates,
+    selectedTemplate,
+    selectedEntityId,
+    selectEntity,
   } = useEditor();
 
   // Painting state
@@ -229,7 +233,50 @@ export function Viewport() {
     paintedTilesRef.current.clear();
   }, [undoActions, setProject]);
 
-  // Mouse down: start painting
+  // Find entity at a tile position
+  const getEntityAtTile = useCallback(
+    (tileX: number, tileY: number): number | null => {
+      if (!engine) return null;
+      const entities = engine.ecs.getAllEntities();
+      for (const entity of entities) {
+        const pos = engine.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+        if (pos && pos.x === tileX && pos.y === tileY) {
+          return entity;
+        }
+      }
+      return null;
+    },
+    [engine]
+  );
+
+  // Spawn entity from template
+  const spawnEntity = useCallback(
+    (tileX: number, tileY: number) => {
+      if (!engine || !selectedTemplate) return;
+      const template = entityTemplates.find((t) => t.name === selectedTemplate);
+      if (!template) return;
+
+      const entity = engine.ecs.createEntity();
+      for (const comp of template.components) {
+        const data = { ...comp.defaults };
+        // Override position with click location
+        if (comp.type === 'Position') {
+          data.x = tileX;
+          data.y = tileY;
+        }
+        try {
+          engine.ecs.addComponent(entity, comp.type, data);
+        } catch {
+          // Component type not defined - skip silently
+        }
+      }
+      setProject({ modified: true });
+      selectEntity(entity);
+    },
+    [engine, entityTemplates, selectedTemplate, setProject, selectEntity]
+  );
+
+  // Mouse down: start painting or handle entity placement/selection
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!engine || mode !== 'edit') return;
@@ -241,6 +288,21 @@ export function Viewport() {
       const worldPos = engine.camera.screenToWorld(screenX, screenY);
       const tilePos = engine.camera.worldToTile(worldPos.x, worldPos.y, TILE_SIZE);
 
+      // Entity mode: place or select
+      if (tool === 'entity') {
+        if (e.button === 0) {
+          // Left click: place entity or select existing
+          const existingEntity = getEntityAtTile(tilePos.x, tilePos.y);
+          if (existingEntity !== null) {
+            selectEntity(existingEntity);
+          } else if (selectedTemplate) {
+            spawnEntity(tilePos.x, tilePos.y);
+          }
+        }
+        return;
+      }
+
+      // Paint/Erase mode: existing tile painting logic
       isPaintingRef.current = true;
       strokeChangesRef.current = [];
       paintedTilesRef.current.clear();
@@ -270,7 +332,7 @@ export function Viewport() {
         paintBrush(tilePos.x, tilePos.y);
       }
     },
-    [engine, mode, brushSize, brushShape, captureTileState, paintBrush]
+    [engine, mode, tool, brushSize, brushShape, captureTileState, paintBrush, getEntityAtTile, selectEntity, selectedTemplate, spawnEntity]
   );
 
   // Mouse move: continue painting if dragging
@@ -398,9 +460,27 @@ export function Viewport() {
         return;
       }
 
-      // Toggle eraser
+      // Entity mode shortcut
       if (e.key === 'e' || e.key === 'E') {
-        setTool(tool === 'erase' ? 'paint' : 'erase');
+        setTool('entity');
+        return;
+      }
+
+      // Paint mode shortcut
+      if (e.key === 'p' || e.key === 'P') {
+        setTool('paint');
+        return;
+      }
+
+      // Erase mode shortcut
+      if (e.key === 'x' || e.key === 'X') {
+        setTool('erase');
+        return;
+      }
+
+      // Deselect entity
+      if (e.key === 'Escape') {
+        selectEntity(null);
         return;
       }
 
@@ -431,7 +511,7 @@ export function Viewport() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [engine, setProject, undoActions, tool, setTool, setBrushSize]);
+  }, [engine, setProject, undoActions, tool, setTool, setBrushSize, selectEntity]);
 
   // Trigger draw frame for edit mode
   useEffect(() => {
@@ -442,22 +522,41 @@ export function Viewport() {
       // In edit mode, we still need to render even though the game loop is stopped
       engine.loop.drawOnce?.();
 
-      // Draw brush preview on top
-      if (hoverTile) {
-        const camera = engine.camera;
-        const tileMap = engine.tileMap;
-        const renderer = engine.renderer;
+      const camera = engine.camera;
+      const renderer = engine.renderer;
 
-        const previewTiles = getBrushTiles(hoverTile.x, hoverTile.y, brushSize, brushShape);
-        const previewColor = tool === 'erase' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(79, 70, 229, 0.5)';
-
-        for (const tile of previewTiles) {
-          if (!tileMap.isInBounds(tile.x, tile.y)) continue;
-
-          const screenPos = camera.worldToScreen(tile.x * TILE_SIZE, tile.y * TILE_SIZE);
+      // Draw selection highlight
+      if (selectedEntityId !== null && engine.ecs.isAlive(selectedEntityId)) {
+        const pos = engine.ecs.getComponent<{ x: number; y: number }>(selectedEntityId, 'Position');
+        if (pos) {
+          const screenPos = camera.worldToScreen(pos.x * TILE_SIZE, pos.y * TILE_SIZE);
           const size = TILE_SIZE * camera.zoom;
+          renderer.strokeRectScreen(screenPos.x, screenPos.y, size, size, '#fbbf24');
+        }
+      }
 
-          renderer.drawRectScreen(screenPos.x, screenPos.y, size, size, previewColor);
+      // Draw brush/entity preview on top
+      if (hoverTile) {
+        const tileMap = engine.tileMap;
+
+        if (tool === 'entity' && selectedTemplate) {
+          // Entity placement preview
+          const screenPos = camera.worldToScreen(hoverTile.x * TILE_SIZE, hoverTile.y * TILE_SIZE);
+          const size = TILE_SIZE * camera.zoom;
+          renderer.drawRectScreen(screenPos.x, screenPos.y, size, size, 'rgba(34, 197, 94, 0.5)');
+        } else if (tool !== 'entity') {
+          // Tile brush preview
+          const previewTiles = getBrushTiles(hoverTile.x, hoverTile.y, brushSize, brushShape);
+          const previewColor = tool === 'erase' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(79, 70, 229, 0.5)';
+
+          for (const tile of previewTiles) {
+            if (!tileMap.isInBounds(tile.x, tile.y)) continue;
+
+            const screenPos = camera.worldToScreen(tile.x * TILE_SIZE, tile.y * TILE_SIZE);
+            const size = TILE_SIZE * camera.zoom;
+
+            renderer.drawRectScreen(screenPos.x, screenPos.y, size, size, previewColor);
+          }
         }
       }
 
@@ -469,7 +568,7 @@ export function Viewport() {
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [engine, mode, hoverTile, brushSize, brushShape, tool]);
+  }, [engine, mode, hoverTile, brushSize, brushShape, tool, selectedEntityId, selectedTemplate]);
 
   return (
     <div ref={containerRef} className="w-full h-full bg-editor-bg overflow-hidden">
