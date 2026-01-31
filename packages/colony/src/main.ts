@@ -774,6 +774,11 @@ engine.ecs.addSystem({
     const context = createActionContext();
 
     for (const e of entities) {
+      // Skip AI decision if on a caravan
+      if (engine.ecs.hasComponent(e, 'CaravanTask')) {
+        continue;
+      }
+
       const aiState = engine.ecs.getComponent<{ lastHungerPercent: number; needsReeval: boolean }>(e, 'AIState')!;
       const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger')!;
       const currentPercent = hunger.current / hunger.max;
