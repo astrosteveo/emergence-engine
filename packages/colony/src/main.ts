@@ -76,31 +76,6 @@ engine.ecs.defineComponent('CaravanTask', {
   homeStockpile: null as Entity | null,
 });
 
-function spawnFood(count: number): void {
-  const halfW = Math.floor(engine.tileMap.width / 2);
-  const halfH = Math.floor(engine.tileMap.height / 2);
-  let spawned = 0;
-  let attempts = 0;
-  const maxAttempts = count * 10;
-
-  while (spawned < count && attempts < maxAttempts) {
-    attempts++;
-    const tileX = Math.floor(Math.random() * engine.tileMap.width) - halfW;
-    const tileY = Math.floor(Math.random() * engine.tileMap.height) - halfH;
-
-    if (engine.tileMap.isWalkable(tileX, tileY)) {
-      const food = engine.ecs.createEntity();
-      engine.ecs.addComponent(food, 'Position', {
-        x: tileX * TILE_SIZE + TILE_SIZE / 2,
-        y: tileY * TILE_SIZE + TILE_SIZE / 2,
-      });
-      engine.ecs.addComponent(food, 'Food', { nutrition: 30 });
-      engine.ecs.addComponent(food, 'Sprite', { width: 12, height: 12, color: '#4ade80' });
-      spawned++;
-    }
-  }
-}
-
 function spawnStockpile(tileX: number, tileY: number, factionId: string, initialFood: number): Entity {
   const stockpile = engine.ecs.createEntity();
   engine.ecs.addComponent(stockpile, 'Position', {
@@ -139,17 +114,14 @@ function spawnFactionPawn(tileX: number, tileY: number, factionId: string): Enti
 
 // Phase 6: Two-colony setup
 // Colony A (Rich) - Red faction on the left
-const redStockpile = spawnStockpile(-20, 0, 'red', 30);
+spawnStockpile(-20, 0, 'red', 30);
 const redPawn1 = spawnFactionPawn(-19, 1, 'red');
-const redPawn2 = spawnFactionPawn(-21, 1, 'red');
-const redPawn3 = spawnFactionPawn(-20, -1, 'red');
+spawnFactionPawn(-21, 1, 'red');
+spawnFactionPawn(-20, -1, 'red');
 
 // Colony B (Poor) - Blue faction on the right
-const blueStockpile = spawnStockpile(20, 0, 'blue', 5);
-const bluePawn1 = spawnFactionPawn(21, 0, 'blue');
-
-// Track first pawn for camera/UI (use red pawn 1)
-const pawn = redPawn1;
+spawnStockpile(20, 0, 'blue', 5);
+spawnFactionPawn(21, 0, 'blue');
 
 // Used by AIDecisionSystem (Task 12)
 export function createActionContext(): ActionContext {
