@@ -19,6 +19,7 @@
 import { ToolsPanel } from './ToolsPanel';
 import { TerrainPalette } from './TerrainPalette';
 import { BuildingPalette } from './BuildingPalette';
+import { EntityPalette } from './EntityPalette';
 
 export function Sidebar() {
   return (
@@ -26,26 +27,7 @@ export function Sidebar() {
       <ToolsPanel />
       <TerrainPalette />
       <BuildingPalette />
-
-      {/* Entity palette placeholder */}
-      <div className="p-3 border-b border-editor-border flex-1">
-        <h3 className="text-xs font-semibold text-editor-text-muted uppercase tracking-wider mb-2">
-          Entities
-        </h3>
-        <div className="text-sm text-editor-text-muted italic">
-          Entity placement coming in Phase 9
-        </div>
-      </div>
-
-      {/* Inspector placeholder */}
-      <div className="p-3">
-        <h3 className="text-xs font-semibold text-editor-text-muted uppercase tracking-wider mb-2">
-          Inspector
-        </h3>
-        <div className="text-sm text-editor-text-muted italic">
-          Select an entity to inspect
-        </div>
-      </div>
+      <EntityPalette />
     </div>
   );
 }
