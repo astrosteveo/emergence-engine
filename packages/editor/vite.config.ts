@@ -18,11 +18,27 @@
 
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  root: '.',
   build: {
-    outDir: 'dist',
+    lib: {
+      entry: resolve(__dirname, 'src/index.ts'),
+      name: 'EmergenceEditor',
+      fileName: 'index',
+      formats: ['es'],
+    },
+    rollupOptions: {
+      external: ['react', 'react-dom', 'react/jsx-runtime', 'emergence-engine'],
+      output: {
+        globals: {
+          react: 'React',
+          'react-dom': 'ReactDOM',
+          'emergence-engine': 'EmergenceEngine',
+        },
+      },
+    },
+    cssCodeSplit: false,
   },
 });

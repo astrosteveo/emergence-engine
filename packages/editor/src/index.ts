@@ -16,6 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Styles (consumers can import 'emergence-editor/styles.css' separately)
+import './styles/index.css';
+
 // Context and hooks
 export { EditorProvider, useEditor } from './hooks/useEditorContext';
 export type { EditorMode, EditorTool, ProjectInfo, EditorProviderProps } from './hooks/useEditorContext';
