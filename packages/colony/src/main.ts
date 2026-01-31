@@ -895,9 +895,9 @@ engine.ecs.addSystem({
           const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger');
 
           if (stockpile && hunger && stockpile.food > 0) {
-            const consumed = Math.min(30, stockpile.food); // Consume up to 30 nutrition
-            stockpile.food -= consumed;
-            hunger.current = Math.max(0, hunger.current - consumed);
+            // Each meal consumes 1 food unit but provides 30 hunger reduction
+            stockpile.food -= 1;
+            hunger.current = Math.max(0, hunger.current - 30);
           }
         }
         engine.ecs.removeComponent(e, 'CurrentTask');
