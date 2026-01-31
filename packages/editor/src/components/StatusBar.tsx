@@ -19,7 +19,16 @@
 import { useEditor } from '../hooks/useEditorContext';
 
 export function StatusBar() {
-  const { engine, mode, mouseWorldPos } = useEditor();
+  const {
+    engine,
+    mode,
+    mouseWorldPos,
+    tool,
+    brushSize,
+    brushShape,
+    selectedTerrain,
+    selectedBuilding,
+  } = useEditor();
 
   const tilePos =
     mouseWorldPos && engine
@@ -28,6 +37,15 @@ export function StatusBar() {
 
   const zoom = engine?.camera.zoom ?? 1;
   const entityCount = engine?.ecs.getAllEntities().length ?? 0;
+
+  // Build brush info string
+  const getBrushInfo = () => {
+    if (tool === 'erase') {
+      return `Eraser ${brushSize}x${brushSize} ${brushShape}`;
+    }
+    const selection = selectedBuilding || selectedTerrain || 'None';
+    return `Brush: ${selection} ${brushSize}x${brushSize} ${brushShape}`;
+  };
 
   return (
     <div className="h-6 bg-editor-surface border-t border-editor-border flex items-center px-3 text-xs text-editor-text-muted gap-6">
@@ -40,6 +58,9 @@ export function StatusBar() {
         />
         <span className="uppercase">{mode}</span>
       </div>
+
+      {/* Brush info */}
+      <div className="text-editor-text">{getBrushInfo()}</div>
 
       {/* Tile coordinates */}
       <div>
