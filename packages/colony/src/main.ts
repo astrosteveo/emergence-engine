@@ -137,16 +137,19 @@ function spawnFactionPawn(tileX: number, tileY: number, factionId: string): Enti
   return pawn;
 }
 
-// Spawn food items
-spawnFood(20);
+// Phase 6: Two-colony setup
+// Colony A (Rich) - Red faction on the left
+const redStockpile = spawnStockpile(-20, 0, 'red', 30);
+const redPawn1 = spawnFactionPawn(-19, 1, 'red');
+const redPawn2 = spawnFactionPawn(-21, 1, 'red');
+const redPawn3 = spawnFactionPawn(-20, -1, 'red');
 
-// Create pawn entity at world center
-const pawn = engine.ecs.createEntity();
-engine.ecs.addComponent(pawn, 'Position', { x: 0, y: 0 });
-engine.ecs.addComponent(pawn, 'Sprite');
-engine.ecs.addComponent(pawn, 'Pawn');
-engine.ecs.addComponent(pawn, 'Hunger', { current: 25, max: 100, rate: 2 });
-engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval: true });
+// Colony B (Poor) - Blue faction on the right
+const blueStockpile = spawnStockpile(20, 0, 'blue', 5);
+const bluePawn1 = spawnFactionPawn(21, 0, 'blue');
+
+// Track first pawn for camera/UI (use red pawn 1)
+const pawn = redPawn1;
 
 // Used by AIDecisionSystem (Task 12)
 export function createActionContext(): ActionContext {
