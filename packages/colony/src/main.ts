@@ -33,7 +33,6 @@ engine.tileMap.defineTerrain('stone', { color: '#6c757d', walkable: true });
 
 // Generate 64x64 world
 generateTerrain(engine.tileMap, { width: 64, height: 64, seed: Date.now() });
-spawnFood(20);
 
 // Create pathfinder using TileMap walkability
 const pathfinder = new Pathfinder((x, y) => engine.tileMap.isWalkable(x, y));
@@ -73,6 +72,9 @@ function spawnFood(count: number): void {
     }
   }
 }
+
+// Spawn food items
+spawnFood(20);
 
 // Create pawn entity at world center
 const pawn = engine.ecs.createEntity();
