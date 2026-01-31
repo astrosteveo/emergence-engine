@@ -15,6 +15,7 @@ A web-based 2D game engine for simulation games. Code-first, browser-native, min
 - **TileMap** — Terrain and building layers with center-origin coordinates
 - **Terrain Generation** — Simplex noise-based procedural generation
 - **Pathfinding** — A* pathfinding with customizable walkability
+- **Utility AI** — Action-based decision system for autonomous entities
 - **Renderer** — Canvas 2D with world-space and screen-space drawing
 
 ## Quick Start
@@ -28,7 +29,7 @@ npm run dev
 ## Usage
 
 ```typescript
-import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
+import { Engine, generateTerrain, Pathfinder, ActionRegistry } from 'emergence-engine';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
@@ -86,6 +87,7 @@ engine.input      // Input system
 engine.renderer   // Canvas renderer
 engine.camera     // Camera (via renderer)
 engine.tileMap    // Tile map
+engine.ai         // Action registry (utility AI)
 
 engine.start()           // Start game loop
 engine.stop()            // Stop game loop
@@ -176,6 +178,35 @@ const path = pathfinder.findPath(fromX, fromY, toX, toY);
 const pathfinder = new Pathfinder(isWalkable, { maxIterations: 1000 });
 ```
 
+### Utility AI (ActionRegistry)
+
+```typescript
+// Define actions with canExecute, score, and execute
+engine.ai.defineAction('eat', {
+  canExecute(entity, ctx) {
+    // Check if action is possible
+    return ctx.ecs.hasComponent(entity, 'Hunger') &&
+           ctx.findNearest(entity, 'Food') !== null;
+  },
+  score(entity, ctx) {
+    // Return 0-1 priority score
+    const hunger = ctx.ecs.getComponent(entity, 'Hunger');
+    return hunger.value / 100;  // Higher hunger = higher priority
+  },
+  execute(entity, ctx) {
+    // Perform the action
+    const food = ctx.findNearest(entity, 'Food');
+    // Set up task to move to and eat food...
+  },
+});
+
+// Evaluate and pick best action for an entity
+const actionContext = { ecs: engine.ecs, findNearest: engine.findNearest.bind(engine) };
+const scores = engine.ai.evaluateAll(entity, actionContext);  // All scored actions
+const best = engine.ai.pickBest(entity, actionContext);       // Highest scoring action name
+engine.ai.execute(best, entity, actionContext);               // Run the action
+```
+
 ### Renderer
 
 ```typescript
@@ -213,7 +244,7 @@ packages/
 │       ├── input/          # Keyboard + mouse polling
 │       ├── render/         # Canvas 2D primitives + Camera
 │       ├── world/          # TileMap, terrain generation
-│       ├── ai/             # A* pathfinding
+│       ├── ai/             # A* pathfinding, utility AI
 │       ├── Engine.ts       # Unified entry point
 │       └── index.ts        # Public exports
 │
@@ -228,7 +259,7 @@ packages/
 - [x] Phase 2: ECS Foundation — Entity-Component-System
 - [x] Phase 3: World — TileMap, Camera, terrain generation
 - [x] Phase 4: A Pawn Lives — Click-to-move, pathfinding, hunger
-- [ ] Phase 5: Pawn Thinks — Utility AI, actions, food items
+- [x] Phase 5: Pawn Thinks — Utility AI, actions, autonomous behavior
 - [ ] Phase 6: Two Colonies — Factions, regions, trade
 
 ## License
