@@ -39,7 +39,7 @@ The first open-source, browser-native game engine with an integrated editor. Eve
 | Tile painting | ✅ Done | Paint terrain, place buildings |
 | Entity placement | ✅ Done | Spawn entities from templates |
 | Component inspector | ✅ Done | View/edit entity components |
-| Play-in-editor | 🔲 Planned | Test without leaving browser (Phase 10) |
+| Play-in-editor | ✅ Done | Test without leaving browser (Phase 10) |
 
 ### Milestone 3: Distribution & Polish
 *Goal: Easy for others to use the engine for their own games.*

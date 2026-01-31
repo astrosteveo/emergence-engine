@@ -15,7 +15,7 @@ Monorepo containing:
 
 ## Current Status
 
-Phases 1-9 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry), Serialization (save/load). Colony game demonstrates multi-colony caravan system. Editor provides browser-native visual editing with tile painting (terrain/buildings), entity placement from templates, and component inspector.
+Phases 1-10 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry), Serialization (save/load). Colony game demonstrates multi-colony caravan system. Editor is now a reusable component library that games can embed. Colony imports and mounts editor components with its own engine instance. Play/Stop toggles the game loop with automatic snapshot/restore so you can test changes and revert to the edit-time state.
 
 ## Quick Start
 
@@ -81,9 +81,14 @@ packages/
 │
 └── colony/                 # Colony game (uses engine API)
     ├── src/
-    │   └── main.ts         # Game entry point
+    │   ├── definitions.ts  # Game definitions for editor integration
+    │   ├── setup.ts        # Engine setup (components, systems, AI)
+    │   ├── render.ts       # Colony-specific rendering
+    │   ├── EditorApp.tsx   # React app integrating editor
+    │   ├── main.tsx        # Entry point (editor mode)
+    │   └── game.ts         # Standalone game mode
     ├── index.html
-    └── package.json        # depends on emergence-engine
+    └── package.json        # depends on emergence-engine, emergence-editor
 ```
 
 ## Code Style
