@@ -56,6 +56,10 @@ export function Viewport() {
   const paintedTilesRef = useRef<Set<string>>(new Set());
   const [hoverTile, setHoverTile] = useState<{ x: number; y: number } | null>(null);
 
+  // MMB panning state
+  const isPanningRef = useRef(false);
+  const lastPanPosRef = useRef<{ x: number; y: number } | null>(null);
+
   // Handle external engine: switch to Viewport's canvas
   useEffect(() => {
     if (!engine) return;
@@ -330,15 +334,26 @@ export function Viewport() {
     [engine, gameDefinitions, entityTemplates, selectedTemplate, setProject, selectEntity]
   );
 
-  // Mouse down: start painting or handle entity placement/selection
+  // Mouse down: start painting, panning, or handle entity placement/selection
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!engine || mode !== 'edit') return;
-      if (e.button !== 0 && e.button !== 2) return; // Only left or right click
+      if (!engine) return;
 
       const rect = e.currentTarget.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
+
+      // Middle mouse button: start panning
+      if (e.button === 1) {
+        e.preventDefault();
+        isPanningRef.current = true;
+        lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      if (mode !== 'edit') return;
+      if (e.button !== 0 && e.button !== 2) return; // Only left or right click for painting
+
       const worldPos = engine.camera.screenToWorld(screenX, screenY);
       const tilePos = engine.camera.worldToTile(worldPos.x, worldPos.y, TILE_SIZE);
 
@@ -389,10 +404,19 @@ export function Viewport() {
     [engine, mode, tool, brushSize, brushShape, captureTileState, paintBrush, getEntityAtTile, selectEntity, selectedTemplate, spawnEntity]
   );
 
-  // Mouse move: continue painting if dragging
+  // Mouse move: continue painting or panning if dragging
   const handleMouseMovePaint = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!engine) return;
+
+      // Handle MMB panning
+      if (isPanningRef.current && lastPanPosRef.current) {
+        const dx = e.clientX - lastPanPosRef.current.x;
+        const dy = e.clientY - lastPanPosRef.current.y;
+        engine.camera.pan(-dx, -dy);
+        lastPanPosRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
 
       const rect = e.currentTarget.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
@@ -434,18 +458,26 @@ export function Viewport() {
     [engine, mode, brushSize, brushShape, captureTileState, paintBrush, setMouseWorldPos]
   );
 
-  // Mouse up: commit stroke
+  // Mouse up: commit stroke or stop panning
   const handleMouseUp = useCallback(() => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      lastPanPosRef.current = null;
+    }
     if (isPaintingRef.current) {
       isPaintingRef.current = false;
       commitStroke();
     }
   }, [commitStroke]);
 
-  // Mouse leave: commit stroke and clear hover
+  // Mouse leave: commit stroke, stop panning, and clear hover
   const handleMouseLeavePaint = useCallback(() => {
     setMouseWorldPos(null);
     setHoverTile(null);
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      lastPanPosRef.current = null;
+    }
     if (isPaintingRef.current) {
       isPaintingRef.current = false;
       commitStroke();
@@ -483,8 +515,6 @@ export function Viewport() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-
-      const panSpeed = 16;
 
       // Undo/Redo
       if (e.ctrlKey || e.metaKey) {
@@ -545,30 +575,6 @@ export function Viewport() {
           deleteSelectedEntity();
           return;
         }
-      }
-
-      // Camera panning
-      switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-          engine.camera.pan(0, -panSpeed);
-          setProject({ modified: true });
-          break;
-        case 'ArrowDown':
-        case 's':
-          engine.camera.pan(0, panSpeed);
-          setProject({ modified: true });
-          break;
-        case 'ArrowLeft':
-        case 'a':
-          engine.camera.pan(-panSpeed, 0);
-          setProject({ modified: true });
-          break;
-        case 'ArrowRight':
-        case 'd':
-          engine.camera.pan(panSpeed, 0);
-          setProject({ modified: true });
-          break;
       }
     };
 

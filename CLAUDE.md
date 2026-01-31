@@ -122,7 +122,7 @@ packages/
 
 ## Editor Controls
 
-- **Pan**: WASD or arrow keys
+- **Pan**: Middle mouse button drag
 - **Zoom**: Mouse scroll wheel (discrete levels: 1x, 2x, 4x)
 - **Play/Stop**: Button in toolbar (toggles simulation)
 - **Paint mode**: P key
