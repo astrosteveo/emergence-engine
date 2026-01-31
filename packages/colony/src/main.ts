@@ -1116,8 +1116,8 @@ engine.onDraw(() => {
   }
 
   // Instructions (top-left)
-  engine.renderer.drawTextScreen('Autonomous mode | +/-: Zoom | `: Debug', 10, 30, { color: '#888' });
+  engine.renderer.drawTextScreen('Two Colonies | +/-: Zoom | `: Debug', 10, 30, { color: '#888' });
 });
 
 engine.start();
-console.log('Colony - Built with Emergence Engine (Phase 5: Pawn Thinks)');
+console.log('Colony - Built with Emergence Engine (Phase 6: Two Colonies)');
