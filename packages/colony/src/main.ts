@@ -116,6 +116,27 @@ function spawnStockpile(tileX: number, tileY: number, factionId: string, initial
   return stockpile;
 }
 
+function spawnFactionPawn(tileX: number, tileY: number, factionId: string): Entity {
+  const pawn = engine.ecs.createEntity();
+  engine.ecs.addComponent(pawn, 'Position', {
+    x: tileX * TILE_SIZE + TILE_SIZE / 2,
+    y: tileY * TILE_SIZE + TILE_SIZE / 2,
+  });
+  engine.ecs.addComponent(pawn, 'Sprite', {
+    width: 24,
+    height: 24,
+    color: factionId === 'red' ? '#f87171' : '#60a5fa',
+  });
+  engine.ecs.addComponent(pawn, 'Pawn');
+  engine.ecs.addComponent(pawn, 'Faction', { id: factionId });
+  engine.ecs.addComponent(pawn, 'Inventory', { capacity: PAWN_CARRY_CAPACITY, food: 0 });
+  engine.ecs.addComponent(pawn, 'Hunger', { current: 20, max: 100, rate: 2 });
+  engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.2, needsReeval: true });
+  engine.ecs.addComponent(pawn, 'ColonyMemory', { known: [] });
+
+  return pawn;
+}
+
 // Spawn food items
 spawnFood(20);
 
