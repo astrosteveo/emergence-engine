@@ -260,6 +260,19 @@ engine.ai.defineAction('wander', {
   },
 });
 
+function findHomeStockpile(pawnEntity: Entity): Entity | null {
+  const faction = engine.ecs.getComponent<{ id: string }>(pawnEntity, 'Faction');
+  if (!faction) return null;
+
+  for (const s of engine.ecs.query(['Stockpile', 'Position'])) {
+    const stockpile = engine.ecs.getComponent<{ factionId: string }>(s, 'Stockpile')!;
+    if (stockpile.factionId === faction.id) {
+      return s;
+    }
+  }
+  return null;
+}
+
 // Camera control system
 engine.ecs.addSystem({
   name: 'CameraControl',
@@ -290,6 +303,66 @@ engine.ecs.addSystem({
       }>(e, 'ColonyMemory')!;
       for (const entry of memory.known) {
         entry.ticksSinceVisit++;
+      }
+    }
+  },
+});
+
+// Memory update system: when near a foreign stockpile, update memory
+engine.ecs.addSystem({
+  name: 'MemoryUpdate',
+  query: ['Pawn', 'Position', 'Faction', 'ColonyMemory'],
+  update(entities) {
+    const stockpiles = engine.ecs.query(['Stockpile', 'Position']);
+
+    for (const pawn of entities) {
+      const pawnPos = engine.ecs.getComponent<{ x: number; y: number }>(pawn, 'Position')!;
+      const pawnFaction = engine.ecs.getComponent<{ id: string }>(pawn, 'Faction')!;
+      const memory = engine.ecs.getComponent<{
+        known: Array<{
+          factionId: string;
+          stockpileX: number;
+          stockpileY: number;
+          lastSeenFood: number;
+          ticksSinceVisit: number;
+        }>;
+      }>(pawn, 'ColonyMemory')!;
+
+      const pawnTileX = Math.floor(pawnPos.x / TILE_SIZE);
+      const pawnTileY = Math.floor(pawnPos.y / TILE_SIZE);
+
+      for (const s of stockpiles) {
+        const stockpileComp = engine.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+        const stockpilePos = engine.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+
+        // Skip own faction's stockpile
+        if (stockpileComp.factionId === pawnFaction.id) continue;
+
+        const stockpileTileX = Math.floor(stockpilePos.x / TILE_SIZE);
+        const stockpileTileY = Math.floor(stockpilePos.y / TILE_SIZE);
+
+        const dx = pawnTileX - stockpileTileX;
+        const dy = pawnTileY - stockpileTileY;
+        const distSq = dx * dx + dy * dy;
+
+        // Within visual range (3 tiles)
+        if (distSq <= 9) {
+          const existing = memory.known.find((k) => k.factionId === stockpileComp.factionId);
+          if (existing) {
+            existing.lastSeenFood = stockpileComp.food;
+            existing.ticksSinceVisit = 0;
+            existing.stockpileX = stockpileTileX;
+            existing.stockpileY = stockpileTileY;
+          } else {
+            memory.known.push({
+              factionId: stockpileComp.factionId,
+              stockpileX: stockpileTileX,
+              stockpileY: stockpileTileY,
+              lastSeenFood: stockpileComp.food,
+              ticksSinceVisit: 0,
+            });
+          }
+        }
       }
     }
   },
