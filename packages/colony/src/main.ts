@@ -913,13 +913,34 @@ engine.ecs.addSystem({
   },
 });
 
-// Camera follow system
+// Camera follow system - follow caravan pawns or first red pawn
 engine.ecs.addSystem({
   name: 'CameraFollow',
   query: ['Pawn', 'Position'],
   update(entities) {
+    // Prefer following a pawn on a caravan
+    let followTarget: Entity | null = null;
+
     for (const e of entities) {
-      const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
+      if (engine.ecs.hasComponent(e, 'CaravanTask')) {
+        followTarget = e;
+        break;
+      }
+    }
+
+    // Fall back to first red pawn
+    if (!followTarget) {
+      for (const e of entities) {
+        const faction = engine.ecs.getComponent<{ id: string }>(e, 'Faction');
+        if (faction?.id === 'red') {
+          followTarget = e;
+          break;
+        }
+      }
+    }
+
+    if (followTarget) {
+      const pos = engine.ecs.getComponent<{ x: number; y: number }>(followTarget, 'Position')!;
       engine.camera.centerOn(pos.x, pos.y);
     }
   },
