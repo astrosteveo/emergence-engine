@@ -42,6 +42,7 @@ export function Viewport() {
     selectedBuilding,
     undoActions,
     entityTemplates,
+    registerEntityTemplates,
     selectedTemplate,
     selectedEntityId,
     selectEntity,
@@ -70,6 +71,35 @@ export function Viewport() {
     // Define basic buildings
     newEngine.tileMap.defineBuilding('wall', { color: '#4a4a4a', solid: true });
     newEngine.tileMap.defineBuilding('floor', { color: '#8b7355', solid: false });
+
+    // Define editor-mode components for entity placement
+    newEngine.ecs.defineComponent('Position', { x: 0, y: 0 });
+    newEngine.ecs.defineComponent('Renderable', { char: '?', color: '#ffffff' });
+    newEngine.ecs.defineComponent('Name', { name: 'Entity' });
+
+    // Register default entity templates
+    registerEntityTemplates([
+      {
+        name: 'marker',
+        label: 'Marker',
+        icon: '📍',
+        components: [
+          { type: 'Position', defaults: { x: 0, y: 0 } },
+          { type: 'Renderable', defaults: { char: '!', color: '#fbbf24' } },
+          { type: 'Name', defaults: { name: 'Marker' } },
+        ],
+      },
+      {
+        name: 'spawn',
+        label: 'Spawn Point',
+        icon: '⭐',
+        components: [
+          { type: 'Position', defaults: { x: 0, y: 0 } },
+          { type: 'Renderable', defaults: { char: 'S', color: '#22c55e' } },
+          { type: 'Name', defaults: { name: 'Spawn Point' } },
+        ],
+      },
+    ]);
 
     // Create a default map
     newEngine.tileMap.create(64, 64, 'grass');
@@ -139,7 +169,7 @@ export function Viewport() {
     return () => {
       newEngine.stop();
     };
-  }, [setEngine]);
+  }, [setEngine, registerEntityTemplates]);
 
   // Handle canvas resize
   useEffect(() => {
