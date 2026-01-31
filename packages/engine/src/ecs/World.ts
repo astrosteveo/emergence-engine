@@ -19,22 +19,32 @@
 /** Entity is a packed 32-bit integer: lower 20 bits = index, upper 12 bits = generation */
 export type Entity = number;
 
-function entityIndex(e: Entity): number {
+export function entityIndex(e: Entity): number {
   return e & 0xfffff;
 }
 
-function entityGeneration(e: Entity): number {
+export function entityGeneration(e: Entity): number {
   return e >>> 20;
 }
 
-function makeEntity(index: number, gen: number): Entity {
+export function makeEntity(index: number, gen: number): Entity {
   return (gen << 20) | index;
 }
 
-interface ComponentDefinition<T = unknown> {
+export interface ComponentDefinition<T = unknown> {
   name: string;
   defaults: T;
   storage: (T | undefined)[];
+}
+
+export interface SerializedEntity {
+  id: Entity;
+  components: Record<string, unknown>;
+}
+
+export interface ComponentSchema {
+  name: string;
+  defaults: object;
 }
 
 export interface System {
@@ -151,6 +161,104 @@ export class World {
     for (const system of this.systems) {
       const entities = this.query(system.query);
       system.update(entities, dt);
+    }
+  }
+
+  // ============================================
+  // Serialization accessors
+  // ============================================
+
+  /**
+   * Returns all alive entities.
+   */
+  getAllEntities(): Entity[] {
+    const result: Entity[] = [];
+    for (let index = 0; index < this.alive.length; index++) {
+      if (this.alive[index]) {
+        result.push(makeEntity(index, this.generations[index]));
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Returns all components attached to an entity.
+   */
+  getComponentsForEntity(entity: Entity): Record<string, unknown> {
+    if (!this.isAlive(entity)) return {};
+    const index = entityIndex(entity);
+    const result: Record<string, unknown> = {};
+    for (const [name, def] of this.components.entries()) {
+      const component = def.storage[index];
+      if (component !== undefined) {
+        result[name] = component;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Returns all component definitions as schemas for serialization.
+   */
+  getAllComponentDefs(): ComponentSchema[] {
+    return Array.from(this.components.values()).map(def => ({
+      name: def.name,
+      defaults: def.defaults as object,
+    }));
+  }
+
+  /**
+   * Loads entities from serialized data.
+   * Components must already be defined before calling this.
+   * Preserves exact entity IDs for reference integrity.
+   */
+  loadEntities(savedEntities: SerializedEntity[]): void {
+    for (const saved of savedEntities) {
+      const index = entityIndex(saved.id);
+      const gen = entityGeneration(saved.id);
+
+      // Ensure arrays are large enough
+      while (this.generations.length <= index) {
+        this.generations.push(0);
+        this.alive.push(false);
+      }
+
+      // Remove from free list if present
+      const freeIdx = this.freeList.indexOf(index);
+      if (freeIdx !== -1) {
+        this.freeList.splice(freeIdx, 1);
+      }
+
+      // Set the generation and mark alive
+      this.generations[index] = gen;
+      this.alive[index] = true;
+
+      // Load components
+      for (const [compName, compData] of Object.entries(saved.components)) {
+        const def = this.components.get(compName);
+        if (def) {
+          def.storage[index] = compData as object;
+        }
+      }
+    }
+  }
+
+  /**
+   * Clears all entities and component data but preserves component definitions.
+   */
+  clear(): void {
+    // Clear all entity data
+    for (let i = 0; i < this.alive.length; i++) {
+      this.alive[i] = false;
+      this.generations[i] = 0;
+    }
+    this.freeList.length = 0;
+    this.generations.length = 0;
+    this.alive.length = 0;
+
+    // Clear all component storage
+    for (const def of this.components.values()) {
+      def.storage.length = 0;
     }
   }
 }

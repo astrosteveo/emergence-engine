@@ -9,9 +9,11 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=colony",
-    "build": "npm run build --workspace=emergence-engine && npm run build --workspace=colony",
+    "dev:editor": "npm run dev --workspace=emergence-editor",
+    "build": "npm run build --workspace=emergence-engine && npm run build --workspace=colony && npm run build --workspace=emergence-editor",
     "build:engine": "npm run build --workspace=emergence-engine",
     "build:colony": "npm run build --workspace=colony",
+    "build:editor": "npm run build --workspace=emergence-editor",
     "test": "npm run test --workspace=emergence-engine",
     "test:watch": "npm run test:watch --workspace=emergence-engine",
     "test:coverage": "npm run test:coverage --workspace=emergence-engine"

@@ -21,17 +21,34 @@ import { TileMap } from '../world/TileMap';
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
-  readonly width: number;
-  readonly height: number;
+  private _width: number;
+  private _height: number;
   readonly camera: Camera;
 
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Failed to get 2D context');
     this.ctx = ctx;
-    this.width = canvas.width;
-    this.height = canvas.height;
-    this.camera = new Camera(this.width, this.height);
+    this._width = canvas.width;
+    this._height = canvas.height;
+    this.camera = new Camera(this._width, this._height);
+  }
+
+  get width(): number {
+    return this._width;
+  }
+
+  get height(): number {
+    return this._height;
+  }
+
+  /**
+   * Updates the renderer dimensions. Call this when the canvas is resized.
+   */
+  resize(width: number, height: number): void {
+    this._width = width;
+    this._height = height;
+    this.camera.resize(width, height);
   }
 
   clear(color: string = '#1a1a2e'): void {
@@ -80,6 +97,11 @@ export class Renderer {
   drawRectScreen(screenX: number, screenY: number, width: number, height: number, color: string): void {
     this.ctx.fillStyle = color;
     this.ctx.fillRect(screenX, screenY, width, height);
+  }
+
+  strokeRectScreen(screenX: number, screenY: number, width: number, height: number, color: string): void {
+    this.ctx.strokeStyle = color;
+    this.ctx.strokeRect(screenX, screenY, width, height);
   }
 
   drawTextScreen(

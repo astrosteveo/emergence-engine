@@ -4,6 +4,7 @@
 
 Monorepo containing:
 - `packages/engine/` - Emergence Engine (the product)
+- `packages/editor/` - Browser-native visual editor (React + Vite)
 - `packages/colony/` - Colony game (built with the engine, proves it works)
 
 ## Project Docs
@@ -14,16 +15,27 @@ Monorepo containing:
 
 ## Current Status
 
-Phases 1-6 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry). Colony game demonstrates multi-colony caravan system.
+Phases 1-7 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry), Serialization (save/load). Colony game demonstrates multi-colony caravan system. Editor package provides browser-native visual editing with Edit/Play mode toggle.
+
+## Quick Start
+
+```bash
+npm install           # Install all workspace dependencies (run from root)
+npm run dev:editor    # Start the editor
+```
 
 ## Commands
 
+All commands should be run from the repository root (uses npm workspaces).
+
 ```bash
-# From repository root
+# Development
 npm run dev           # Start Colony dev server (http://localhost:5173)
-npm run build         # Build engine, then Colony
+npm run dev:editor    # Start Editor dev server (http://localhost:5173)
+npm run build         # Build engine, Colony, and Editor
 npm run build:engine  # Build engine only
 npm run build:colony  # Build Colony only
+npm run build:editor  # Build Editor only
 npm test              # Run engine tests once
 npm run test:watch    # Tests in watch mode
 npm run test:coverage # Tests with coverage report
@@ -34,6 +46,10 @@ npm test              # Run tests
 
 # From packages/colony
 npm run dev           # Start dev server
+npm run build         # Build for production
+
+# From packages/editor
+npm run dev           # Start editor dev server
 npm run build         # Build for production
 ```
 
@@ -49,9 +65,19 @@ packages/
 │   │   ├── render/         # Canvas 2D primitives + Camera
 │   │   ├── world/          # TileMap, terrain generation, noise
 │   │   ├── ai/             # A* pathfinding, Utility AI
+│   │   ├── serialization/  # Save/load game state
 │   │   ├── Engine.ts       # Unified entry point
 │   │   └── index.ts        # Public exports
 │   └── package.json
+│
+├── editor/                 # Visual Editor (React + Vite)
+│   ├── src/
+│   │   ├── components/     # UI components (Toolbar, Viewport, etc.)
+│   │   ├── hooks/          # React hooks (useEditorContext)
+│   │   ├── storage/        # localStorage and file I/O
+│   │   ├── styles/         # Tailwind CSS
+│   │   └── main.tsx        # Entry point
+│   └── package.json        # depends on emergence-engine
 │
 └── colony/                 # Colony game (uses engine API)
     ├── src/
@@ -85,14 +111,23 @@ packages/
 - Component order matters - define components before any code that uses them (including spawn functions)
 - Browser captures certain keys (F1-F12) - use backtick or letter keys for game hotkeys
 - AI actions should verify path reachability in execute() before committing to a task
+- Components must be defined BEFORE calling deserialize() - save file includes schemas but games define runtime behavior
+- Terrain/building definitions get sequential IDs - register in same order when loading saves
+- Actions are not serialized - re-register actions after loading a save
+
+## Editor Controls
+
+- **Pan**: WASD or arrow keys
+- **Zoom**: Mouse scroll wheel (discrete levels: 1x, 2x, 4x)
+- **Play/Stop**: Button in toolbar (or toggles simulation)
 
 ## Public API
 
 All public exports are in `packages/engine/src/index.ts`. Colony (and external consumers) import from `'emergence-engine'`:
 
 ```typescript
-import { Engine, generateTerrain, Pathfinder, ActionRegistry } from 'emergence-engine';
-import type { Entity, System, EngineConfig, PathNode, ActionDefinition, ActionContext, TerrainDef, BuildingDef, GeneratorConfig, ActionScore, MouseButton } from 'emergence-engine';
+import { Engine, generateTerrain, Pathfinder, ActionRegistry, serialize, deserialize } from 'emergence-engine';
+import type { Entity, System, EngineConfig, PathNode, ActionDefinition, ActionContext, TerrainDef, BuildingDef, GeneratorConfig, ActionScore, MouseButton, EmergenceSaveFile, CameraState } from 'emergence-engine';
 ```
 
 Key exports:
@@ -103,7 +138,8 @@ Key exports:
 - `World`, `Entity`, `System` - ECS primitives (also accessible via `engine.ecs`)
 - `Camera`, `Renderer`, `TileMap` - Subsystems (also accessible via engine instance)
 - `ActionRegistry` - Utility AI framework for autonomous entities (also accessible via `engine.ai`)
-- Type exports: `MouseButton`, `PathNode`, `ActionDefinition`, `ActionContext`, `TerrainDef`, `BuildingDef`, `GeneratorConfig`, `ActionScore`
+- `serialize`, `deserialize` - Save/load game state
+- Type exports: `MouseButton`, `PathNode`, `ActionDefinition`, `ActionContext`, `TerrainDef`, `BuildingDef`, `GeneratorConfig`, `ActionScore`, `EmergenceSaveFile`, `CameraState`
 
 ## Git Workflow
 

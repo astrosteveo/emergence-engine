@@ -20,11 +20,13 @@ export { Engine } from './Engine';
 export type { EngineConfig } from './Engine';
 export { GameLoop } from './core/GameLoop';
 export { World } from './ecs/World';
-export type { Entity, System } from './ecs/World';
+export type { Entity, System, SerializedEntity, ComponentSchema } from './ecs/World';
+export { entityIndex, entityGeneration, makeEntity } from './ecs/World';
 export { Input } from './input/Input';
 export type { MouseButton } from './input/Input';
 export { Renderer } from './render/Renderer';
 export { Camera } from './render/Camera';
+export type { CameraState } from './render/Camera';
 export { TileMap } from './world/TileMap';
 export type { TerrainDef, BuildingDef } from './world/TileMap';
 export { generateTerrain } from './world/generate';
@@ -33,3 +35,7 @@ export { Pathfinder } from './ai/Pathfinder';
 export type { PathNode, WalkabilityFn, PathfinderOptions } from './ai/Pathfinder';
 export { ActionRegistry } from './ai/ActionRegistry';
 export type { ActionDefinition, ActionContext, ActionScore } from './ai/ActionRegistry';
+
+// Serialization
+export { serialize, deserialize } from './serialization';
+export type { EmergenceSaveFile, SerializeOptions, DeserializeOptions } from './serialization';
