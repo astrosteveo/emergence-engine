@@ -42,6 +42,16 @@ engine.tileMap.defineTerrain('stone', { color: '#6c757d', walkable: true });
 // Generate 64x64 world
 generateTerrain(engine.tileMap, { width: 64, height: 64, seed: Date.now() });
 
+// Ensure walkable corridor between colonies (y=0 from x=-22 to x=22)
+// This guarantees pawns can always path between the two stockpiles
+for (let x = -22; x <= 22; x++) {
+  for (let y = -2; y <= 2; y++) {
+    if (!engine.tileMap.isWalkable(x, y)) {
+      engine.tileMap.setTerrain(x, y, 'grass');
+    }
+  }
+}
+
 // Create pathfinder using TileMap walkability
 const pathfinder = new Pathfinder((x, y) => engine.tileMap.isWalkable(x, y));
 
