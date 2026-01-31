@@ -39,6 +39,7 @@ export class TileMap {
   private _height = 0;
   private terrainData: Uint8Array | null = null;
   private buildingData: Uint8Array | null = null;
+  private territoryData: Map<number, string> = new Map();
 
   get width(): number {
     return this._width;
@@ -146,6 +147,33 @@ export class TileMap {
   clearBuilding(x: number, y: number): void {
     if (!this.buildingData || !this.isInBounds(x, y)) return;
     this.buildingData[this.toIndex(x, y)] = 0;
+  }
+
+  getTerritory(x: number, y: number): string | null {
+    if (!this.terrainData || !this.isInBounds(x, y)) return null;
+    return this.territoryData.get(this.toIndex(x, y)) ?? null;
+  }
+
+  setTerritory(x: number, y: number, factionId: string): void {
+    if (!this.terrainData || !this.isInBounds(x, y)) return;
+    this.territoryData.set(this.toIndex(x, y), factionId);
+  }
+
+  clearTerritory(x: number, y: number): void {
+    if (!this.terrainData || !this.isInBounds(x, y)) return;
+    this.territoryData.delete(this.toIndex(x, y));
+  }
+
+  claimRadius(centerX: number, centerY: number, radius: number, factionId: string): void {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = centerX + dx;
+        const y = centerY + dy;
+        if (this.isInBounds(x, y) && dx * dx + dy * dy <= radius * radius) {
+          this.setTerritory(x, y, factionId);
+        }
+      }
+    }
   }
 
   isWalkable(x: number, y: number): boolean {

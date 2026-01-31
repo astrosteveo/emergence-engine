@@ -26,6 +26,14 @@ const engine = new Engine({ canvas, tickRate: 20 });
 const TILE_SIZE = 16;
 const PAWN_SPEED = 80; // pixels per second
 
+// Phase 6 constants
+const TERRITORY_RADIUS = 8;
+const SURPLUS_THRESHOLD = 10;
+const DEFICIT_THRESHOLD = 5;
+const MEMORY_DECAY_TICKS = 600;
+const PROXIMITY_SIGNAL_RANGE = 12;
+const PAWN_CARRY_CAPACITY = 5;
+
 // Define terrain types
 engine.tileMap.defineTerrain('water', { color: '#1d3557', walkable: false });
 engine.tileMap.defineTerrain('grass', { color: '#3a5a40', walkable: true });
@@ -33,6 +41,16 @@ engine.tileMap.defineTerrain('stone', { color: '#6c757d', walkable: true });
 
 // Generate 64x64 world
 generateTerrain(engine.tileMap, { width: 64, height: 64, seed: Date.now() });
+
+// Ensure walkable corridor between colonies (y=0 from x=-22 to x=22)
+// This guarantees pawns can always path between the two stockpiles
+for (let x = -22; x <= 22; x++) {
+  for (let y = -2; y <= 2; y++) {
+    if (!engine.tileMap.isWalkable(x, y)) {
+      engine.tileMap.setTerrain(x, y, 'grass');
+    }
+  }
+}
 
 // Create pathfinder using TileMap walkability
 const pathfinder = new Pathfinder((x, y) => engine.tileMap.isWalkable(x, y));
@@ -48,41 +66,72 @@ engine.ecs.defineComponent('Food', { nutrition: 30 });
 engine.ecs.defineComponent('CurrentTask', { action: '', target: null as Entity | null });
 engine.ecs.defineComponent('AIState', { lastHungerPercent: 0, needsReeval: true });
 
-function spawnFood(count: number): void {
-  const halfW = Math.floor(engine.tileMap.width / 2);
-  const halfH = Math.floor(engine.tileMap.height / 2);
-  let spawned = 0;
-  let attempts = 0;
-  const maxAttempts = count * 10;
+// Phase 6 components
+engine.ecs.defineComponent('Faction', { id: '' });
+engine.ecs.defineComponent('Inventory', { capacity: PAWN_CARRY_CAPACITY, food: 0 });
+engine.ecs.defineComponent('Stockpile', { factionId: '', food: 0 });
+engine.ecs.defineComponent('ColonyMemory', {
+  known: [] as Array<{
+    factionId: string;
+    stockpileX: number;
+    stockpileY: number;
+    lastSeenFood: number;
+    ticksSinceVisit: number;
+  }>,
+});
+engine.ecs.defineComponent('CaravanTask', {
+  targetFactionId: '',
+  targetStockpile: null as Entity | null,
+  phase: 'pickup' as 'pickup' | 'traveling-there' | 'dropoff' | 'returning',
+  homeStockpile: null as Entity | null,
+});
 
-  while (spawned < count && attempts < maxAttempts) {
-    attempts++;
-    const tileX = Math.floor(Math.random() * engine.tileMap.width) - halfW;
-    const tileY = Math.floor(Math.random() * engine.tileMap.height) - halfH;
+function spawnStockpile(tileX: number, tileY: number, factionId: string, initialFood: number): Entity {
+  const stockpile = engine.ecs.createEntity();
+  engine.ecs.addComponent(stockpile, 'Position', {
+    x: tileX * TILE_SIZE + TILE_SIZE / 2,
+    y: tileY * TILE_SIZE + TILE_SIZE / 2,
+  });
+  engine.ecs.addComponent(stockpile, 'Stockpile', { factionId, food: initialFood });
+  engine.ecs.addComponent(stockpile, 'Sprite', { width: 32, height: 32, color: factionId === 'red' ? '#dc2626' : '#2563eb' });
 
-    if (engine.tileMap.isWalkable(tileX, tileY)) {
-      const food = engine.ecs.createEntity();
-      engine.ecs.addComponent(food, 'Position', {
-        x: tileX * TILE_SIZE + TILE_SIZE / 2,
-        y: tileY * TILE_SIZE + TILE_SIZE / 2,
-      });
-      engine.ecs.addComponent(food, 'Food', { nutrition: 30 });
-      engine.ecs.addComponent(food, 'Sprite', { width: 12, height: 12, color: '#4ade80' });
-      spawned++;
-    }
-  }
+  // Claim territory around stockpile
+  engine.tileMap.claimRadius(tileX, tileY, TERRITORY_RADIUS, factionId);
+
+  return stockpile;
 }
 
-// Spawn food items
-spawnFood(20);
+function spawnFactionPawn(tileX: number, tileY: number, factionId: string): Entity {
+  const pawn = engine.ecs.createEntity();
+  engine.ecs.addComponent(pawn, 'Position', {
+    x: tileX * TILE_SIZE + TILE_SIZE / 2,
+    y: tileY * TILE_SIZE + TILE_SIZE / 2,
+  });
+  engine.ecs.addComponent(pawn, 'Sprite', {
+    width: 24,
+    height: 24,
+    color: factionId === 'red' ? '#f87171' : '#60a5fa',
+  });
+  engine.ecs.addComponent(pawn, 'Pawn');
+  engine.ecs.addComponent(pawn, 'Faction', { id: factionId });
+  engine.ecs.addComponent(pawn, 'Inventory', { capacity: PAWN_CARRY_CAPACITY, food: 0 });
+  engine.ecs.addComponent(pawn, 'Hunger', { current: 20, max: 100, rate: 2 });
+  engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.2, needsReeval: true });
+  engine.ecs.addComponent(pawn, 'ColonyMemory', { known: [] });
 
-// Create pawn entity at world center
-const pawn = engine.ecs.createEntity();
-engine.ecs.addComponent(pawn, 'Position', { x: 0, y: 0 });
-engine.ecs.addComponent(pawn, 'Sprite');
-engine.ecs.addComponent(pawn, 'Pawn');
-engine.ecs.addComponent(pawn, 'Hunger', { current: 25, max: 100, rate: 2 });
-engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval: true });
+  return pawn;
+}
+
+// Phase 6: Two-colony setup
+// Colony A (Rich) - Red faction on the left
+spawnStockpile(-20, 0, 'red', 30);
+const redPawn1 = spawnFactionPawn(-19, 1, 'red');
+spawnFactionPawn(-21, 1, 'red');
+spawnFactionPawn(-20, -1, 'red');
+
+// Colony B (Poor) - Blue faction on the right
+spawnStockpile(20, 0, 'blue', 5);
+spawnFactionPawn(21, 0, 'blue');
 
 // Used by AIDecisionSystem (Task 12)
 export function createActionContext(): ActionContext {
@@ -101,32 +150,90 @@ export function createActionContext(): ActionContext {
 
 engine.ai.defineAction('eat', {
   canExecute(entity, context) {
-    return context.findNearest(entity, 'Food') !== null;
+    // Check for loose food
+    const nearestFood = context.findNearest(entity, 'Food');
+    if (nearestFood) return true;
+
+    // Check for own faction's stockpile with food
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return context.findNearest(entity, 'Food') !== null;
+
+    for (const s of context.ecs.query(['Stockpile', 'Position'])) {
+      const stockpile = context.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+      if (stockpile.factionId === faction.id && stockpile.food > 0) {
+        return true;
+      }
+    }
+    return false;
   },
   score(entity, context) {
     const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
     if (!hunger) return 0;
-    return hunger.current / hunger.max;
+    const percent = hunger.current / hunger.max;
+    // Only prioritize eating when moderately hungry (above 40%)
+    if (percent < 0.4) return 0;
+    return percent;
   },
   execute(entity, context) {
-    const food = context.findNearest(entity, 'Food');
-    if (!food) return;
-
-    const foodPos = context.ecs.getComponent<{ x: number; y: number }>(food, 'Position');
-    if (!foodPos) return;
-
     const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
     if (!entityPos) return;
 
-    const tileX = Math.floor(foodPos.x / TILE_SIZE);
-    const tileY = Math.floor(foodPos.y / TILE_SIZE);
     const entityTileX = Math.floor(entityPos.x / TILE_SIZE);
     const entityTileY = Math.floor(entityPos.y / TILE_SIZE);
 
-    // Check if path exists before committing to task
-    const path = pathfinder.findPath(entityTileX, entityTileY, tileX, tileY);
-    if (!path) return; // Food is unreachable, don't set task
+    // Find nearest food source (loose food or own stockpile)
+    let targetX: number | null = null;
+    let targetY: number | null = null;
+    let targetType: 'food' | 'stockpile' = 'food';
+    let targetEntity: Entity | null = null;
+    let bestDistSq = Infinity;
 
+    // Check loose food
+    const nearestFood = context.findNearest(entity, 'Food');
+    if (nearestFood) {
+      const foodPos = context.ecs.getComponent<{ x: number; y: number }>(nearestFood, 'Position');
+      if (foodPos) {
+        const dx = foodPos.x - entityPos.x;
+        const dy = foodPos.y - entityPos.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          targetX = Math.floor(foodPos.x / TILE_SIZE);
+          targetY = Math.floor(foodPos.y / TILE_SIZE);
+          targetType = 'food';
+          targetEntity = nearestFood;
+        }
+      }
+    }
+
+    // Check own stockpile
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (faction) {
+      for (const s of context.ecs.query(['Stockpile', 'Position'])) {
+        const stockpile = context.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+        if (stockpile.factionId === faction.id && stockpile.food > 0) {
+          const stockpilePos = context.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+          const dx = stockpilePos.x - entityPos.x;
+          const dy = stockpilePos.y - entityPos.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < bestDistSq) {
+            bestDistSq = distSq;
+            targetX = Math.floor(stockpilePos.x / TILE_SIZE);
+            targetY = Math.floor(stockpilePos.y / TILE_SIZE);
+            targetType = 'stockpile';
+            targetEntity = s;
+          }
+        }
+      }
+    }
+
+    if (targetX === null || targetY === null || targetEntity === null) return;
+
+    // Check if path exists
+    const path = pathfinder.findPath(entityTileX, entityTileY, targetX, targetY);
+    if (!path) return;
+
+    // Clear existing path components
     if (context.ecs.hasComponent(entity, 'PathFollow')) {
       context.ecs.removeComponent(entity, 'PathFollow');
     }
@@ -134,12 +241,15 @@ engine.ai.defineAction('eat', {
       context.ecs.removeComponent(entity, 'PathTarget');
     }
 
-    context.ecs.addComponent(entity, 'PathTarget', { x: tileX, y: tileY });
+    context.ecs.addComponent(entity, 'PathTarget', { x: targetX, y: targetY });
 
     if (context.ecs.hasComponent(entity, 'CurrentTask')) {
       context.ecs.removeComponent(entity, 'CurrentTask');
     }
-    context.ecs.addComponent(entity, 'CurrentTask', { action: 'eat', target: food });
+    context.ecs.addComponent(entity, 'CurrentTask', {
+      action: targetType === 'food' ? 'eat' : 'eat-stockpile',
+      target: targetEntity,
+    });
   },
 });
 
@@ -193,6 +303,202 @@ engine.ai.defineAction('wander', {
   },
 });
 
+engine.ai.defineAction('explore', {
+  canExecute() {
+    return true;
+  },
+  score() {
+    return 0.15; // Slightly higher than wander (0.1)
+  },
+  execute(entity, context) {
+    const pos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!pos) return;
+
+    const currentTileX = Math.floor(pos.x / TILE_SIZE);
+    const currentTileY = Math.floor(pos.y / TILE_SIZE);
+
+    // Explore toward the opposite side of the map (toward other colony)
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    const direction = faction?.id === 'red' ? 1 : -1; // Red goes right, blue goes left
+
+    // Pick a random tile biased toward the other colony's direction
+    const range = 10;
+    let targetX = currentTileX;
+    let targetY = currentTileY;
+    let found = false;
+
+    for (let attempts = 0; attempts < 15 && !found; attempts++) {
+      const dx = Math.floor(Math.random() * range) * direction + Math.floor(Math.random() * 5) - 2;
+      const dy = Math.floor(Math.random() * 11) - 5;
+      const tx = currentTileX + dx;
+      const ty = currentTileY + dy;
+
+      if (engine.tileMap.isWalkable(tx, ty)) {
+        const path = pathfinder.findPath(currentTileX, currentTileY, tx, ty);
+        if (path) {
+          targetX = tx;
+          targetY = ty;
+          found = true;
+        }
+      }
+    }
+
+    if (!found) return;
+
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+
+    context.ecs.addComponent(entity, 'PathTarget', { x: targetX, y: targetY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'explore', target: null });
+  },
+});
+
+function findHomeStockpile(pawnEntity: Entity): Entity | null {
+  const faction = engine.ecs.getComponent<{ id: string }>(pawnEntity, 'Faction');
+  if (!faction) return null;
+
+  for (const s of engine.ecs.query(['Stockpile', 'Position'])) {
+    const stockpile = engine.ecs.getComponent<{ factionId: string }>(s, 'Stockpile')!;
+    if (stockpile.factionId === faction.id) {
+      return s;
+    }
+  }
+  return null;
+}
+
+function findStockpileByFaction(factionId: string): Entity | null {
+  for (const s of engine.ecs.query(['Stockpile', 'Position'])) {
+    const stockpile = engine.ecs.getComponent<{ factionId: string }>(s, 'Stockpile')!;
+    if (stockpile.factionId === factionId) {
+      return s;
+    }
+  }
+  return null;
+}
+
+engine.ai.defineAction('caravan', {
+  canExecute(entity, context) {
+    // Already on a caravan?
+    if (context.ecs.hasComponent(entity, 'CaravanTask')) return false;
+
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return false;
+
+    // Own stockpile has surplus?
+    const homeStockpile = findHomeStockpile(entity);
+    if (!homeStockpile) return false;
+
+    const stockpileComp = context.ecs.getComponent<{ food: number }>(homeStockpile, 'Stockpile');
+    if (!stockpileComp || stockpileComp.food <= SURPLUS_THRESHOLD) return false;
+
+    // Know of a colony in deficit?
+    const memory = context.ecs.getComponent<{
+      known: Array<{ factionId: string; lastSeenFood: number; ticksSinceVisit: number }>;
+    }>(entity, 'ColonyMemory');
+    if (!memory) return false;
+
+    const needyColony = memory.known.find(
+      (k) => k.lastSeenFood < DEFICIT_THRESHOLD && k.ticksSinceVisit < MEMORY_DECAY_TICKS
+    );
+    return needyColony !== undefined;
+  },
+  score(entity, context) {
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return 0;
+
+    const homeStockpile = findHomeStockpile(entity);
+    if (!homeStockpile) return 0;
+
+    const stockpileComp = context.ecs.getComponent<{ food: number }>(homeStockpile, 'Stockpile');
+    if (!stockpileComp) return 0;
+
+    const memory = context.ecs.getComponent<{
+      known: Array<{ factionId: string; lastSeenFood: number; ticksSinceVisit: number }>;
+    }>(entity, 'ColonyMemory');
+    if (!memory) return 0;
+
+    const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
+    if (!hunger) return 0;
+
+    // Find the neediest known colony
+    const needyColony = memory.known.find(
+      (k) => k.lastSeenFood < DEFICIT_THRESHOLD && k.ticksSinceVisit < MEMORY_DECAY_TICKS
+    );
+    if (!needyColony) return 0;
+
+    // Calculate score
+    const surplusFactor = (stockpileComp.food - SURPLUS_THRESHOLD) / stockpileComp.food;
+    const deficitFactor = 1 - needyColony.lastSeenFood / DEFICIT_THRESHOLD;
+    const hungerPercent = hunger.current / hunger.max;
+    const hungerPenalty = 1 - hungerPercent * 0.8;
+
+    return surplusFactor * deficitFactor * hungerPenalty * 0.7;
+  },
+  execute(entity, context) {
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return;
+
+    const memory = context.ecs.getComponent<{
+      known: Array<{ factionId: string; stockpileX: number; stockpileY: number; lastSeenFood: number }>;
+    }>(entity, 'ColonyMemory');
+    if (!memory) return;
+
+    const needyColony = memory.known.find((k) => k.lastSeenFood < DEFICIT_THRESHOLD);
+    if (!needyColony) return;
+
+    const targetStockpile = findStockpileByFaction(needyColony.factionId);
+    if (!targetStockpile) return;
+
+    const homeStockpile = findHomeStockpile(entity);
+    if (!homeStockpile) return;
+
+    const homePos = context.ecs.getComponent<{ x: number; y: number }>(homeStockpile, 'Position');
+    if (!homePos) return;
+
+    const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!entityPos) return;
+
+    const homeTileX = Math.floor(homePos.x / TILE_SIZE);
+    const homeTileY = Math.floor(homePos.y / TILE_SIZE);
+    const entityTileX = Math.floor(entityPos.x / TILE_SIZE);
+    const entityTileY = Math.floor(entityPos.y / TILE_SIZE);
+
+    // Verify path to home stockpile exists
+    const path = pathfinder.findPath(entityTileX, entityTileY, homeTileX, homeTileY);
+    if (!path) return;
+
+    // Set up caravan task
+    context.ecs.addComponent(entity, 'CaravanTask', {
+      targetFactionId: needyColony.factionId,
+      targetStockpile,
+      phase: 'pickup',
+      homeStockpile,
+    });
+
+    // Clear existing path and set path to home stockpile
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+    context.ecs.addComponent(entity, 'PathTarget', { x: homeTileX, y: homeTileY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'caravan', target: homeStockpile });
+  },
+});
+
 // Camera control system
 engine.ecs.addSystem({
   name: 'CameraControl',
@@ -212,6 +518,239 @@ engine.ecs.addSystem({
   },
 });
 
+// Memory decay system: increment ticksSinceVisit for all known colonies
+engine.ecs.addSystem({
+  name: 'MemoryDecay',
+  query: ['ColonyMemory'],
+  update(entities) {
+    for (const e of entities) {
+      const memory = engine.ecs.getComponent<{
+        known: Array<{ ticksSinceVisit: number }>;
+      }>(e, 'ColonyMemory')!;
+      for (const entry of memory.known) {
+        entry.ticksSinceVisit++;
+      }
+    }
+  },
+});
+
+// Memory update system: when near a foreign stockpile, update memory
+engine.ecs.addSystem({
+  name: 'MemoryUpdate',
+  query: ['Pawn', 'Position', 'Faction', 'ColonyMemory'],
+  update(entities) {
+    const stockpiles = engine.ecs.query(['Stockpile', 'Position']);
+
+    for (const pawn of entities) {
+      const pawnPos = engine.ecs.getComponent<{ x: number; y: number }>(pawn, 'Position')!;
+      const pawnFaction = engine.ecs.getComponent<{ id: string }>(pawn, 'Faction')!;
+      const memory = engine.ecs.getComponent<{
+        known: Array<{
+          factionId: string;
+          stockpileX: number;
+          stockpileY: number;
+          lastSeenFood: number;
+          ticksSinceVisit: number;
+        }>;
+      }>(pawn, 'ColonyMemory')!;
+
+      const pawnTileX = Math.floor(pawnPos.x / TILE_SIZE);
+      const pawnTileY = Math.floor(pawnPos.y / TILE_SIZE);
+
+      for (const s of stockpiles) {
+        const stockpileComp = engine.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+        const stockpilePos = engine.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+
+        // Skip own faction's stockpile
+        if (stockpileComp.factionId === pawnFaction.id) continue;
+
+        const stockpileTileX = Math.floor(stockpilePos.x / TILE_SIZE);
+        const stockpileTileY = Math.floor(stockpilePos.y / TILE_SIZE);
+
+        const dx = pawnTileX - stockpileTileX;
+        const dy = pawnTileY - stockpileTileY;
+        const distSq = dx * dx + dy * dy;
+
+        // Within visual range (3 tiles)
+        if (distSq <= 9) {
+          const existing = memory.known.find((k) => k.factionId === stockpileComp.factionId);
+          if (existing) {
+            existing.lastSeenFood = stockpileComp.food;
+            existing.ticksSinceVisit = 0;
+            existing.stockpileX = stockpileTileX;
+            existing.stockpileY = stockpileTileY;
+          } else {
+            memory.known.push({
+              factionId: stockpileComp.factionId,
+              stockpileX: stockpileTileX,
+              stockpileY: stockpileTileY,
+              lastSeenFood: stockpileComp.food,
+              ticksSinceVisit: 0,
+            });
+          }
+        }
+      }
+    }
+  },
+});
+
+// Proximity signal system: hear "we need food" from nearby low-food stockpiles
+engine.ecs.addSystem({
+  name: 'ProximitySignal',
+  query: ['Pawn', 'Position', 'Faction', 'ColonyMemory'],
+  update(entities) {
+    const stockpiles = engine.ecs.query(['Stockpile', 'Position']);
+
+    for (const pawn of entities) {
+      const pawnPos = engine.ecs.getComponent<{ x: number; y: number }>(pawn, 'Position')!;
+      const pawnFaction = engine.ecs.getComponent<{ id: string }>(pawn, 'Faction')!;
+      const memory = engine.ecs.getComponent<{
+        known: Array<{
+          factionId: string;
+          stockpileX: number;
+          stockpileY: number;
+          lastSeenFood: number;
+          ticksSinceVisit: number;
+        }>;
+      }>(pawn, 'ColonyMemory')!;
+
+      const pawnTileX = Math.floor(pawnPos.x / TILE_SIZE);
+      const pawnTileY = Math.floor(pawnPos.y / TILE_SIZE);
+
+      for (const s of stockpiles) {
+        const stockpileComp = engine.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+        const stockpilePos = engine.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+
+        // Skip own faction
+        if (stockpileComp.factionId === pawnFaction.id) continue;
+
+        // Only broadcast if in deficit
+        if (stockpileComp.food >= DEFICIT_THRESHOLD) continue;
+
+        const stockpileTileX = Math.floor(stockpilePos.x / TILE_SIZE);
+        const stockpileTileY = Math.floor(stockpilePos.y / TILE_SIZE);
+
+        const dx = pawnTileX - stockpileTileX;
+        const dy = pawnTileY - stockpileTileY;
+        const distSq = dx * dx + dy * dy;
+
+        // Within signal range
+        if (distSq <= PROXIMITY_SIGNAL_RANGE * PROXIMITY_SIGNAL_RANGE) {
+          const existing = memory.known.find((k) => k.factionId === stockpileComp.factionId);
+          if (existing) {
+            // Update if this info is fresher (they're broadcasting need)
+            existing.lastSeenFood = stockpileComp.food;
+            existing.stockpileX = stockpileTileX;
+            existing.stockpileY = stockpileTileY;
+            // Don't reset ticksSinceVisit - they haven't actually visited
+          } else {
+            memory.known.push({
+              factionId: stockpileComp.factionId,
+              stockpileX: stockpileTileX,
+              stockpileY: stockpileTileY,
+              lastSeenFood: stockpileComp.food,
+              ticksSinceVisit: MEMORY_DECAY_TICKS, // Mark as stale since not visited
+            });
+          }
+        }
+      }
+    }
+  },
+});
+
+// Caravan system: handle caravan state machine
+engine.ecs.addSystem({
+  name: 'Caravan',
+  query: ['CaravanTask', 'Position', 'Inventory'],
+  update(entities) {
+    for (const e of entities) {
+      // Skip if still moving
+      if (engine.ecs.hasComponent(e, 'PathFollow') || engine.ecs.hasComponent(e, 'PathTarget')) {
+        continue;
+      }
+
+      const caravan = engine.ecs.getComponent<{
+        targetFactionId: string;
+        targetStockpile: Entity | null;
+        phase: 'pickup' | 'traveling-there' | 'dropoff' | 'returning';
+        homeStockpile: Entity | null;
+      }>(e, 'CaravanTask')!;
+
+      const inventory = engine.ecs.getComponent<{ capacity: number; food: number }>(e, 'Inventory')!;
+
+      if (caravan.phase === 'pickup') {
+        // At home stockpile - pick up food
+        if (caravan.homeStockpile && engine.ecs.isAlive(caravan.homeStockpile)) {
+          const stockpile = engine.ecs.getComponent<{ food: number }>(caravan.homeStockpile, 'Stockpile');
+          if (stockpile && stockpile.food > 0) {
+            const toTake = Math.min(inventory.capacity - inventory.food, stockpile.food);
+            stockpile.food -= toTake;
+            inventory.food += toTake;
+          }
+        }
+
+        // Move to target stockpile
+        if (caravan.targetStockpile && engine.ecs.isAlive(caravan.targetStockpile)) {
+          const targetPos = engine.ecs.getComponent<{ x: number; y: number }>(caravan.targetStockpile, 'Position');
+          if (targetPos) {
+            const targetTileX = Math.floor(targetPos.x / TILE_SIZE);
+            const targetTileY = Math.floor(targetPos.y / TILE_SIZE);
+            engine.ecs.addComponent(e, 'PathTarget', { x: targetTileX, y: targetTileY });
+            caravan.phase = 'traveling-there';
+          }
+        } else {
+          // Target gone, abort
+          engine.ecs.removeComponent(e, 'CaravanTask');
+          if (engine.ecs.hasComponent(e, 'CurrentTask')) {
+            engine.ecs.removeComponent(e, 'CurrentTask');
+          }
+        }
+      } else if (caravan.phase === 'traveling-there') {
+        // Arrived at target - transition to dropoff
+        caravan.phase = 'dropoff';
+      } else if (caravan.phase === 'dropoff') {
+        // At target stockpile - drop off food
+        if (caravan.targetStockpile && engine.ecs.isAlive(caravan.targetStockpile)) {
+          const stockpile = engine.ecs.getComponent<{ food: number }>(caravan.targetStockpile, 'Stockpile');
+          if (stockpile) {
+            stockpile.food += inventory.food;
+            inventory.food = 0;
+          }
+        }
+
+        // Return home
+        if (caravan.homeStockpile && engine.ecs.isAlive(caravan.homeStockpile)) {
+          const homePos = engine.ecs.getComponent<{ x: number; y: number }>(caravan.homeStockpile, 'Position');
+          if (homePos) {
+            const homeTileX = Math.floor(homePos.x / TILE_SIZE);
+            const homeTileY = Math.floor(homePos.y / TILE_SIZE);
+            engine.ecs.addComponent(e, 'PathTarget', { x: homeTileX, y: homeTileY });
+            caravan.phase = 'returning';
+          }
+        } else {
+          // Home gone, just clear task
+          engine.ecs.removeComponent(e, 'CaravanTask');
+          if (engine.ecs.hasComponent(e, 'CurrentTask')) {
+            engine.ecs.removeComponent(e, 'CurrentTask');
+          }
+        }
+      } else if (caravan.phase === 'returning') {
+        // Arrived home - caravan complete
+        engine.ecs.removeComponent(e, 'CaravanTask');
+        if (engine.ecs.hasComponent(e, 'CurrentTask')) {
+          engine.ecs.removeComponent(e, 'CurrentTask');
+        }
+
+        // Trigger AI re-evaluation
+        const aiState = engine.ecs.getComponent<{ needsReeval: boolean }>(e, 'AIState');
+        if (aiState) {
+          aiState.needsReeval = true;
+        }
+      }
+    }
+  },
+});
+
 // AI Decision system: re-evaluate when needed
 engine.ecs.addSystem({
   name: 'AIDecision',
@@ -220,6 +759,11 @@ engine.ecs.addSystem({
     const context = createActionContext();
 
     for (const e of entities) {
+      // Skip AI decision if on a caravan
+      if (engine.ecs.hasComponent(e, 'CaravanTask')) {
+        continue;
+      }
+
       const aiState = engine.ecs.getComponent<{ lastHungerPercent: number; needsReeval: boolean }>(e, 'AIState')!;
       const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger')!;
       const currentPercent = hunger.current / hunger.max;
@@ -348,6 +892,18 @@ engine.ecs.addSystem({
           }
         }
         engine.ecs.removeComponent(e, 'CurrentTask');
+      } else if (task.action === 'eat-stockpile' && task.target !== null) {
+        if (engine.ecs.isAlive(task.target)) {
+          const stockpile = engine.ecs.getComponent<{ food: number }>(task.target, 'Stockpile');
+          const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger');
+
+          if (stockpile && hunger && stockpile.food > 0) {
+            // Each meal consumes 1 food unit but provides 30 hunger reduction
+            stockpile.food -= 1;
+            hunger.current = Math.max(0, hunger.current - 30);
+          }
+        }
+        engine.ecs.removeComponent(e, 'CurrentTask');
       } else if (task.action === 'wander') {
         engine.ecs.removeComponent(e, 'CurrentTask');
       }
@@ -370,13 +926,34 @@ engine.ecs.addSystem({
   },
 });
 
-// Camera follow system
+// Camera follow system - follow caravan pawns or first red pawn
 engine.ecs.addSystem({
   name: 'CameraFollow',
   query: ['Pawn', 'Position'],
   update(entities) {
+    // Prefer following a pawn on a caravan
+    let followTarget: Entity | null = null;
+
     for (const e of entities) {
-      const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
+      if (engine.ecs.hasComponent(e, 'CaravanTask')) {
+        followTarget = e;
+        break;
+      }
+    }
+
+    // Fall back to first red pawn
+    if (!followTarget) {
+      for (const e of entities) {
+        const faction = engine.ecs.getComponent<{ id: string }>(e, 'Faction');
+        if (faction?.id === 'red') {
+          followTarget = e;
+          break;
+        }
+      }
+    }
+
+    if (followTarget) {
+      const pos = engine.ecs.getComponent<{ x: number; y: number }>(followTarget, 'Position')!;
       engine.camera.centerOn(pos.x, pos.y);
     }
   },
@@ -399,10 +976,24 @@ engine.onDraw(() => {
     engine.renderer.drawRectCentered(pos.x, pos.y, sprite.width, sprite.height, sprite.color);
   }
 
+  // Draw stockpile food counts
+  for (const s of engine.ecs.query(['Stockpile', 'Position'])) {
+    const stockpile = engine.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+    const pos = engine.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+    const screenPos = engine.camera.worldToScreen(pos.x, pos.y - 24);
+    engine.renderer.drawTextScreen(`${stockpile.food}`, screenPos.x, screenPos.y, {
+      font: '14px monospace',
+      color: '#ffffff',
+      align: 'center',
+    });
+  }
+
   // UI: Stats panel (screen-space, bottom-left)
-  const hunger = engine.ecs.getComponent<{ current: number; max: number }>(pawn, 'Hunger')!;
-  const currentTask = engine.ecs.getComponent<{ action: string; target: Entity | null }>(pawn, 'CurrentTask');
-  const taskLabel = currentTask ? currentTask.action.charAt(0).toUpperCase() + currentTask.action.slice(1) : 'Idle';
+  const selectedPawn = redPawn1; // Track first red pawn
+  const selectedHunger = engine.ecs.getComponent<{ current: number; max: number }>(selectedPawn, 'Hunger')!;
+  const selectedTask = engine.ecs.getComponent<{ action: string; target: Entity | null }>(selectedPawn, 'CurrentTask');
+  const selectedFaction = engine.ecs.getComponent<{ id: string }>(selectedPawn, 'Faction');
+  const taskLabel = selectedTask ? selectedTask.action.charAt(0).toUpperCase() + selectedTask.action.slice(1) : 'Idle';
 
   const panelX = 10;
   const panelY = canvas.height - 110;
@@ -413,7 +1004,8 @@ engine.onDraw(() => {
   engine.renderer.drawRectScreen(panelX, panelY, panelWidth, panelHeight, 'rgba(26, 26, 46, 0.9)');
 
   // Title
-  engine.renderer.drawTextScreen('Pawn Stats', panelX + 10, panelY + 22, {
+  const factionLabel = selectedFaction ? ` (${selectedFaction.id})` : '';
+  engine.renderer.drawTextScreen(`Pawn${factionLabel}`, panelX + 10, panelY + 22, {
     font: '14px monospace',
     color: '#ffffff',
   });
@@ -438,13 +1030,13 @@ engine.onDraw(() => {
   engine.renderer.drawRectScreen(barX, barY, barWidth, barHeight, '#333333');
 
   // Hunger bar fill
-  const fillWidth = barWidth * (hunger.current / hunger.max);
-  const hungerColor = hunger.current > 70 ? '#e94560' : hunger.current > 40 ? '#ffdd57' : '#4ade80';
+  const fillWidth = barWidth * (selectedHunger.current / selectedHunger.max);
+  const hungerColor = selectedHunger.current > 70 ? '#e94560' : selectedHunger.current > 40 ? '#ffdd57' : '#4ade80';
   engine.renderer.drawRectScreen(barX, barY, fillWidth, barHeight, hungerColor);
 
   // Hunger value
   engine.renderer.drawTextScreen(
-    `${Math.round(hunger.current)}/${hunger.max}`,
+    `${Math.round(selectedHunger.current)}/${selectedHunger.max}`,
     barX + barWidth + 5,
     barY + 11,
     { font: '11px monospace', color: '#888888' }
@@ -453,13 +1045,20 @@ engine.onDraw(() => {
   // Debug overlay (` toggle)
   if (debugMode) {
     const context = createActionContext();
-    const scores = engine.ai.evaluateAll(pawn, context);
-    const currentTask = engine.ecs.getComponent<{ action: string }>(pawn, 'CurrentTask');
+
+    // Find the selected pawn (first red pawn for now)
+    const debugPawn = redPawn1;
+
+    const scores = engine.ai.evaluateAll(debugPawn, context);
+    const currentTask = engine.ecs.getComponent<{ action: string }>(debugPawn, 'CurrentTask');
+    const caravanTask = engine.ecs.getComponent<{ phase: string; targetFactionId: string }>(debugPawn, 'CaravanTask');
+    const inventory = engine.ecs.getComponent<{ food: number }>(debugPawn, 'Inventory');
+    const memory = engine.ecs.getComponent<{ known: Array<{ factionId: string; lastSeenFood: number }> }>(debugPawn, 'ColonyMemory');
 
     const debugX = 10;
-    const debugY = canvas.height - 220;
-    const debugWidth = 160;
-    const debugHeight = 100;
+    let debugY = canvas.height - 340;
+    const debugWidth = 180;
+    const debugHeight = 220;
 
     engine.renderer.drawRectScreen(debugX, debugY, debugWidth, debugHeight, 'rgba(26, 26, 46, 0.9)');
     engine.renderer.drawTextScreen('AI Debug (`)', debugX + 10, debugY + 22, {
@@ -468,6 +1067,44 @@ engine.onDraw(() => {
     });
 
     let yOffset = 42;
+
+    // Show caravan status if active
+    if (caravanTask) {
+      engine.renderer.drawTextScreen(`Caravan: ${caravanTask.phase}`, debugX + 10, debugY + yOffset, {
+        font: '12px monospace',
+        color: '#fbbf24',
+      });
+      yOffset += 18;
+    }
+
+    // Show inventory
+    if (inventory) {
+      engine.renderer.drawTextScreen(`Carrying: ${inventory.food} food`, debugX + 10, debugY + yOffset, {
+        font: '12px monospace',
+        color: '#60a5fa',
+      });
+      yOffset += 18;
+    }
+
+    // Show known colonies
+    if (memory && memory.known.length > 0) {
+      engine.renderer.drawTextScreen('Known colonies:', debugX + 10, debugY + yOffset, {
+        font: '12px monospace',
+        color: '#888888',
+      });
+      yOffset += 16;
+      for (const k of memory.known) {
+        engine.renderer.drawTextScreen(`  ${k.factionId}: ${k.lastSeenFood} food`, debugX + 10, debugY + yOffset, {
+          font: '11px monospace',
+          color: '#aaaaaa',
+        });
+        yOffset += 14;
+      }
+    }
+
+    yOffset += 4;
+
+    // Show action scores
     for (const { action, score, canExecute } of scores) {
       const isActive = currentTask?.action === action;
       const color = !canExecute ? '#666666' : isActive ? '#4ade80' : '#aaaaaa';
@@ -485,8 +1122,8 @@ engine.onDraw(() => {
   }
 
   // Instructions (top-left)
-  engine.renderer.drawTextScreen('Autonomous mode | +/-: Zoom | `: Debug', 10, 30, { color: '#888' });
+  engine.renderer.drawTextScreen('Two Colonies | +/-: Zoom | `: Debug', 10, 30, { color: '#888' });
 });
 
 engine.start();
-console.log('Colony - Built with Emergence Engine (Phase 5: Pawn Thinks)');
+console.log('Colony - Built with Emergence Engine (Phase 6: Two Colonies)');
