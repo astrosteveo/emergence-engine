@@ -168,7 +168,21 @@ export function createActionContext(): ActionContext {
 
 engine.ai.defineAction('eat', {
   canExecute(entity, context) {
-    return context.findNearest(entity, 'Food') !== null;
+    // Check for loose food
+    const nearestFood = context.findNearest(entity, 'Food');
+    if (nearestFood) return true;
+
+    // Check for own faction's stockpile with food
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return context.findNearest(entity, 'Food') !== null;
+
+    for (const s of context.ecs.query(['Stockpile', 'Position'])) {
+      const stockpile = context.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+      if (stockpile.factionId === faction.id && stockpile.food > 0) {
+        return true;
+      }
+    }
+    return false;
   },
   score(entity, context) {
     const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
@@ -176,24 +190,65 @@ engine.ai.defineAction('eat', {
     return hunger.current / hunger.max;
   },
   execute(entity, context) {
-    const food = context.findNearest(entity, 'Food');
-    if (!food) return;
-
-    const foodPos = context.ecs.getComponent<{ x: number; y: number }>(food, 'Position');
-    if (!foodPos) return;
-
     const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
     if (!entityPos) return;
 
-    const tileX = Math.floor(foodPos.x / TILE_SIZE);
-    const tileY = Math.floor(foodPos.y / TILE_SIZE);
     const entityTileX = Math.floor(entityPos.x / TILE_SIZE);
     const entityTileY = Math.floor(entityPos.y / TILE_SIZE);
 
-    // Check if path exists before committing to task
-    const path = pathfinder.findPath(entityTileX, entityTileY, tileX, tileY);
-    if (!path) return; // Food is unreachable, don't set task
+    // Find nearest food source (loose food or own stockpile)
+    let targetX: number | null = null;
+    let targetY: number | null = null;
+    let targetType: 'food' | 'stockpile' = 'food';
+    let targetEntity: Entity | null = null;
+    let bestDistSq = Infinity;
 
+    // Check loose food
+    const nearestFood = context.findNearest(entity, 'Food');
+    if (nearestFood) {
+      const foodPos = context.ecs.getComponent<{ x: number; y: number }>(nearestFood, 'Position');
+      if (foodPos) {
+        const dx = foodPos.x - entityPos.x;
+        const dy = foodPos.y - entityPos.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          targetX = Math.floor(foodPos.x / TILE_SIZE);
+          targetY = Math.floor(foodPos.y / TILE_SIZE);
+          targetType = 'food';
+          targetEntity = nearestFood;
+        }
+      }
+    }
+
+    // Check own stockpile
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (faction) {
+      for (const s of context.ecs.query(['Stockpile', 'Position'])) {
+        const stockpile = context.ecs.getComponent<{ factionId: string; food: number }>(s, 'Stockpile')!;
+        if (stockpile.factionId === faction.id && stockpile.food > 0) {
+          const stockpilePos = context.ecs.getComponent<{ x: number; y: number }>(s, 'Position')!;
+          const dx = stockpilePos.x - entityPos.x;
+          const dy = stockpilePos.y - entityPos.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < bestDistSq) {
+            bestDistSq = distSq;
+            targetX = Math.floor(stockpilePos.x / TILE_SIZE);
+            targetY = Math.floor(stockpilePos.y / TILE_SIZE);
+            targetType = 'stockpile';
+            targetEntity = s;
+          }
+        }
+      }
+    }
+
+    if (targetX === null || targetY === null || targetEntity === null) return;
+
+    // Check if path exists
+    const path = pathfinder.findPath(entityTileX, entityTileY, targetX, targetY);
+    if (!path) return;
+
+    // Clear existing path components
     if (context.ecs.hasComponent(entity, 'PathFollow')) {
       context.ecs.removeComponent(entity, 'PathFollow');
     }
@@ -201,12 +256,15 @@ engine.ai.defineAction('eat', {
       context.ecs.removeComponent(entity, 'PathTarget');
     }
 
-    context.ecs.addComponent(entity, 'PathTarget', { x: tileX, y: tileY });
+    context.ecs.addComponent(entity, 'PathTarget', { x: targetX, y: targetY });
 
     if (context.ecs.hasComponent(entity, 'CurrentTask')) {
       context.ecs.removeComponent(entity, 'CurrentTask');
     }
-    context.ecs.addComponent(entity, 'CurrentTask', { action: 'eat', target: food });
+    context.ecs.addComponent(entity, 'CurrentTask', {
+      action: targetType === 'food' ? 'eat' : 'eat-stockpile',
+      target: targetEntity,
+    });
   },
 });
 
