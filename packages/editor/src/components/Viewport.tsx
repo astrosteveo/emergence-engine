@@ -47,6 +47,7 @@ export function Viewport() {
     selectedEntityId,
     selectEntity,
     deleteSelectedEntity,
+    gameDefinitions,
   } = useEditor();
 
   // Painting state
@@ -55,8 +56,11 @@ export function Viewport() {
   const paintedTilesRef = useRef<Set<string>>(new Set());
   const [hoverTile, setHoverTile] = useState<{ x: number; y: number } | null>(null);
 
-  // Initialize engine
+  // Initialize engine (only if not provided externally)
   useEffect(() => {
+    // If engine already exists (external), skip initialization
+    if (engine) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -169,7 +173,7 @@ export function Viewport() {
     return () => {
       newEngine.stop();
     };
-  }, [setEngine, registerEntityTemplates]);
+  }, [engine, setEngine, registerEntityTemplates]);
 
   // Handle canvas resize
   useEffect(() => {
@@ -284,7 +288,9 @@ export function Viewport() {
   const spawnEntity = useCallback(
     (tileX: number, tileY: number) => {
       if (!engine || !selectedTemplate) return;
-      const template = entityTemplates.find((t) => t.name === selectedTemplate);
+      // Prefer gameDefinitions templates over internally registered ones
+      const templates = gameDefinitions?.entityTemplates ?? entityTemplates;
+      const template = templates.find((t) => t.name === selectedTemplate);
       if (!template) return;
 
       const entity = engine.ecs.createEntity();
@@ -304,7 +310,7 @@ export function Viewport() {
       setProject({ modified: true });
       selectEntity(entity);
     },
-    [engine, entityTemplates, selectedTemplate, setProject, selectEntity]
+    [engine, gameDefinitions, entityTemplates, selectedTemplate, setProject, selectEntity]
   );
 
   // Mouse down: start painting or handle entity placement/selection
