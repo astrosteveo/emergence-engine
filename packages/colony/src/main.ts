@@ -673,6 +673,99 @@ engine.ecs.addSystem({
   },
 });
 
+// Caravan system: handle caravan state machine
+engine.ecs.addSystem({
+  name: 'Caravan',
+  query: ['CaravanTask', 'Position', 'Inventory'],
+  update(entities) {
+    for (const e of entities) {
+      // Skip if still moving
+      if (engine.ecs.hasComponent(e, 'PathFollow') || engine.ecs.hasComponent(e, 'PathTarget')) {
+        continue;
+      }
+
+      const caravan = engine.ecs.getComponent<{
+        targetFactionId: string;
+        targetStockpile: Entity | null;
+        phase: 'pickup' | 'traveling-there' | 'dropoff' | 'returning';
+        homeStockpile: Entity | null;
+      }>(e, 'CaravanTask')!;
+
+      const inventory = engine.ecs.getComponent<{ capacity: number; food: number }>(e, 'Inventory')!;
+
+      if (caravan.phase === 'pickup') {
+        // At home stockpile - pick up food
+        if (caravan.homeStockpile && engine.ecs.isAlive(caravan.homeStockpile)) {
+          const stockpile = engine.ecs.getComponent<{ food: number }>(caravan.homeStockpile, 'Stockpile');
+          if (stockpile && stockpile.food > 0) {
+            const toTake = Math.min(inventory.capacity - inventory.food, stockpile.food);
+            stockpile.food -= toTake;
+            inventory.food += toTake;
+          }
+        }
+
+        // Move to target stockpile
+        if (caravan.targetStockpile && engine.ecs.isAlive(caravan.targetStockpile)) {
+          const targetPos = engine.ecs.getComponent<{ x: number; y: number }>(caravan.targetStockpile, 'Position');
+          if (targetPos) {
+            const targetTileX = Math.floor(targetPos.x / TILE_SIZE);
+            const targetTileY = Math.floor(targetPos.y / TILE_SIZE);
+            engine.ecs.addComponent(e, 'PathTarget', { x: targetTileX, y: targetTileY });
+            caravan.phase = 'traveling-there';
+          }
+        } else {
+          // Target gone, abort
+          engine.ecs.removeComponent(e, 'CaravanTask');
+          if (engine.ecs.hasComponent(e, 'CurrentTask')) {
+            engine.ecs.removeComponent(e, 'CurrentTask');
+          }
+        }
+      } else if (caravan.phase === 'traveling-there') {
+        // Arrived at target - transition to dropoff
+        caravan.phase = 'dropoff';
+      } else if (caravan.phase === 'dropoff') {
+        // At target stockpile - drop off food
+        if (caravan.targetStockpile && engine.ecs.isAlive(caravan.targetStockpile)) {
+          const stockpile = engine.ecs.getComponent<{ food: number }>(caravan.targetStockpile, 'Stockpile');
+          if (stockpile) {
+            stockpile.food += inventory.food;
+            inventory.food = 0;
+          }
+        }
+
+        // Return home
+        if (caravan.homeStockpile && engine.ecs.isAlive(caravan.homeStockpile)) {
+          const homePos = engine.ecs.getComponent<{ x: number; y: number }>(caravan.homeStockpile, 'Position');
+          if (homePos) {
+            const homeTileX = Math.floor(homePos.x / TILE_SIZE);
+            const homeTileY = Math.floor(homePos.y / TILE_SIZE);
+            engine.ecs.addComponent(e, 'PathTarget', { x: homeTileX, y: homeTileY });
+            caravan.phase = 'returning';
+          }
+        } else {
+          // Home gone, just clear task
+          engine.ecs.removeComponent(e, 'CaravanTask');
+          if (engine.ecs.hasComponent(e, 'CurrentTask')) {
+            engine.ecs.removeComponent(e, 'CurrentTask');
+          }
+        }
+      } else if (caravan.phase === 'returning') {
+        // Arrived home - caravan complete
+        engine.ecs.removeComponent(e, 'CaravanTask');
+        if (engine.ecs.hasComponent(e, 'CurrentTask')) {
+          engine.ecs.removeComponent(e, 'CurrentTask');
+        }
+
+        // Trigger AI re-evaluation
+        const aiState = engine.ecs.getComponent<{ needsReeval: boolean }>(e, 'AIState');
+        if (aiState) {
+          aiState.needsReeval = true;
+        }
+      }
+    }
+  },
+});
+
 // AI Decision system: re-evaluate when needed
 engine.ecs.addSystem({
   name: 'AIDecision',
