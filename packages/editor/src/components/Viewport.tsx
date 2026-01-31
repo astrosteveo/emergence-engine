@@ -34,7 +34,9 @@ export function Viewport() {
     setMouseWorldPos,
     setProject,
     tool,
+    setTool,
     brushSize,
+    setBrushSize,
     brushShape,
     selectedTerrain,
     selectedBuilding,
@@ -356,12 +358,53 @@ export function Viewport() {
     [engine, setProject]
   );
 
-  // Handle keyboard controls for camera panning
+  // Handle keyboard controls for camera panning and shortcuts
   useEffect(() => {
     if (!engine) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle shortcuts if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
       const panSpeed = 16;
+
+      // Undo/Redo
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undoActions.undo(engine);
+          return;
+        }
+        if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+          e.preventDefault();
+          undoActions.redo(engine);
+          return;
+        }
+      }
+
+      // Brush size shortcuts
+      if (e.key === '1') {
+        setBrushSize(1);
+        return;
+      }
+      if (e.key === '2') {
+        setBrushSize(3);
+        return;
+      }
+      if (e.key === '3') {
+        setBrushSize(5);
+        return;
+      }
+
+      // Toggle eraser
+      if (e.key === 'e' || e.key === 'E') {
+        setTool(tool === 'erase' ? 'paint' : 'erase');
+        return;
+      }
+
+      // Camera panning
       switch (e.key) {
         case 'ArrowUp':
         case 'w':
@@ -388,7 +431,7 @@ export function Viewport() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [engine, setProject]);
+  }, [engine, setProject, undoActions, tool, setTool, setBrushSize]);
 
   // Trigger draw frame for edit mode
   useEffect(() => {
