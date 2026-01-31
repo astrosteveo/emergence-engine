@@ -51,6 +51,19 @@ export class Renderer {
     this.camera.resize(width, height);
   }
 
+  /**
+   * Changes the canvas this renderer draws to. Used when embedding the engine
+   * in a different context (e.g., editor integration).
+   */
+  setCanvas(canvas: HTMLCanvasElement): void {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get 2D context');
+    this.ctx = ctx;
+    this._width = canvas.width;
+    this._height = canvas.height;
+    this.camera.resize(this._width, this._height);
+  }
+
   clear(color: string = '#1a1a2e'): void {
     this.ctx.fillStyle = color;
     this.ctx.fillRect(0, 0, this.width, this.height);

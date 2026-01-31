@@ -56,6 +56,16 @@ export function Viewport() {
   const paintedTilesRef = useRef<Set<string>>(new Set());
   const [hoverTile, setHoverTile] = useState<{ x: number; y: number } | null>(null);
 
+  // Handle external engine: switch to Viewport's canvas
+  useEffect(() => {
+    if (!engine) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // If engine was created externally, switch it to use this canvas
+    engine.renderer.setCanvas(canvas);
+  }, [engine]);
+
   // Initialize engine (only if not provided externally)
   useEffect(() => {
     // If engine already exists (external), skip initialization
