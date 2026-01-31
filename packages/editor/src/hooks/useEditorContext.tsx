@@ -21,11 +21,14 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from 'react';
 import type { Engine, Entity } from 'emergence-engine';
 import type { EmergenceSaveFile } from 'emergence-engine';
+import { serialize, deserialize } from 'emergence-engine';
 import type { EntityTemplate } from '../types/templates';
+import type { GameDefinitions } from '../types/GameDefinitions';
 import { useUndo, type UndoState, type UndoActions } from './useUndo';
 import type { BrushSize, BrushShape } from '../utils/brush';
 
@@ -37,6 +40,12 @@ export interface ProjectInfo {
   name: string;
   savedAt: string | null;
   modified: boolean;
+}
+
+export interface EditorProviderProps {
+  children: ReactNode;
+  engine?: Engine | null;
+  gameDefinitions?: GameDefinitions;
 }
 
 interface EditorContextValue {
@@ -72,12 +81,16 @@ interface EditorContextValue {
   selectedEntityId: Entity | null;
   selectEntity: (id: Entity | null) => void;
   deleteSelectedEntity: () => void;
+  gameDefinitions: GameDefinitions | null;
+  playSnapshot: EmergenceSaveFile | null;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
 
-export function EditorProvider({ children }: { children: ReactNode }) {
-  const [engine, setEngine] = useState<Engine | null>(null);
+export function EditorProvider({ children, engine: externalEngine, gameDefinitions: externalDefs }: EditorProviderProps) {
+  const [engine, setEngineState] = useState<Engine | null>(externalEngine ?? null);
+  const [gameDefinitions, setGameDefinitions] = useState<GameDefinitions | null>(externalDefs ?? null);
+  const [playSnapshot, setPlaySnapshot] = useState<EmergenceSaveFile | null>(null);
   const [mode, setModeState] = useState<EditorMode>('edit');
   const [project, setProjectState] = useState<ProjectInfo>({
     name: 'Untitled Project',
@@ -96,6 +109,27 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   // Undo system
   const [undoState, undoActions] = useUndo();
+
+  // Sync external engine
+  useEffect(() => {
+    if (externalEngine) {
+      setEngineState(externalEngine);
+    }
+  }, [externalEngine]);
+
+  // Sync external game definitions
+  useEffect(() => {
+    if (externalDefs) {
+      setGameDefinitions(externalDefs);
+    }
+  }, [externalDefs]);
+
+  // Wrapper for setEngine that allows internal components to set engine when not provided externally
+  const setEngine = useCallback((newEngine: Engine | null) => {
+    if (!externalEngine) {
+      setEngineState(newEngine);
+    }
+  }, [externalEngine]);
 
   // Entity placement state
   const [entityTemplates, setEntityTemplates] = useState<EntityTemplate[]>([]);
@@ -142,16 +176,25 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   const setMode = useCallback(
     (newMode: EditorMode) => {
-      if (engine) {
+      const currentEngine = externalEngine ?? engine;
+      if (currentEngine) {
         if (newMode === 'play') {
-          engine.start();
+          // Snapshot before playing
+          const snapshot = serialize(currentEngine);
+          setPlaySnapshot(snapshot);
+          currentEngine.start();
         } else {
-          engine.stop();
+          currentEngine.stop();
+          // Restore snapshot when stopping
+          if (playSnapshot) {
+            deserialize(currentEngine, playSnapshot);
+            setPlaySnapshot(null);
+          }
         }
       }
       setModeState(newMode);
     },
-    [engine]
+    [externalEngine, engine, playSnapshot]
   );
 
   const setProject = useCallback((info: Partial<ProjectInfo>) => {
@@ -190,6 +233,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         selectedEntityId,
         selectEntity,
         deleteSelectedEntity,
+        gameDefinitions,
+        playSnapshot,
       }}
     >
       {children}
