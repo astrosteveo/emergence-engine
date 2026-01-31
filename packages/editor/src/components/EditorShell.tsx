@@ -19,6 +19,7 @@
 import { Toolbar } from './Toolbar';
 import { Sidebar } from './Sidebar';
 import { Viewport } from './Viewport';
+import { RightSidebar } from './RightSidebar';
 import { StatusBar } from './StatusBar';
 
 export function EditorShell() {
@@ -29,13 +30,16 @@ export function EditorShell() {
 
       {/* Main content area */}
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar */}
+        {/* Left Sidebar */}
         <Sidebar />
 
         {/* Viewport */}
         <div className="flex-1 min-w-0">
           <Viewport />
         </div>
+
+        {/* Right Sidebar */}
+        <RightSidebar />
       </div>
 
       {/* Status bar */}
