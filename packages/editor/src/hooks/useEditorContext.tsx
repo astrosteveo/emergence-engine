@@ -23,12 +23,13 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import type { Engine } from 'emergence-engine';
+import type { Engine, Entity } from 'emergence-engine';
 import type { EmergenceSaveFile } from 'emergence-engine';
+import type { EntityTemplate } from '../types/templates';
 import { useUndo, type UndoState, type UndoActions } from './useUndo';
 import type { BrushSize, BrushShape } from '../utils/brush';
 
-export type EditorTool = 'paint' | 'erase';
+export type EditorTool = 'paint' | 'erase' | 'entity';
 
 export type EditorMode = 'edit' | 'play';
 
@@ -63,6 +64,14 @@ interface EditorContextValue {
   // Undo system
   undoState: UndoState;
   undoActions: UndoActions;
+  // Entity placement (Phase 9)
+  entityTemplates: EntityTemplate[];
+  registerEntityTemplates: (templates: EntityTemplate[]) => void;
+  selectedTemplate: string | null;
+  selectTemplate: (name: string | null) => void;
+  selectedEntityId: Entity | null;
+  selectEntity: (id: Entity | null) => void;
+  deleteSelectedEntity: () => void;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -87,6 +96,34 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   // Undo system
   const [undoState, undoActions] = useUndo();
+
+  // Entity placement state
+  const [entityTemplates, setEntityTemplates] = useState<EntityTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<Entity | null>(null);
+
+  const registerEntityTemplates = useCallback((templates: EntityTemplate[]) => {
+    setEntityTemplates(templates);
+  }, []);
+
+  const selectTemplate = useCallback((name: string | null) => {
+    setSelectedTemplate(name);
+    if (name) {
+      setTool('entity');
+    }
+  }, []);
+
+  const selectEntity = useCallback((id: Entity | null) => {
+    setSelectedEntityId(id);
+  }, []);
+
+  const deleteSelectedEntity = useCallback(() => {
+    if (engine && selectedEntityId !== null && engine.ecs.isAlive(selectedEntityId)) {
+      engine.ecs.destroyEntity(selectedEntityId);
+      setSelectedEntityId(null);
+      setProjectState((prev) => ({ ...prev, modified: true }));
+    }
+  }, [engine, selectedEntityId]);
 
   // Selection handlers - terrain and building are mutually exclusive
   const setSelectedTerrain = useCallback((name: string | null) => {
@@ -146,6 +183,13 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         setSelectedBuilding,
         undoState,
         undoActions,
+        entityTemplates,
+        registerEntityTemplates,
+        selectedTemplate,
+        selectTemplate,
+        selectedEntityId,
+        selectEntity,
+        deleteSelectedEntity,
       }}
     >
       {children}

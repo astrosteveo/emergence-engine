@@ -16,34 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Toolbar } from './Toolbar';
-import { Sidebar } from './Sidebar';
-import { Viewport } from './Viewport';
-import { RightSidebar } from './RightSidebar';
-import { StatusBar } from './StatusBar';
+export interface ComponentTemplate {
+  type: string;
+  defaults: Record<string, unknown>;
+  readonly?: boolean;
+}
 
-export function EditorShell() {
-  return (
-    <div className="h-full w-full flex flex-col">
-      {/* Toolbar */}
-      <Toolbar />
-
-      {/* Main content area */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar */}
-        <Sidebar />
-
-        {/* Viewport */}
-        <div className="flex-1 min-w-0">
-          <Viewport />
-        </div>
-
-        {/* Right Sidebar */}
-        <RightSidebar />
-      </div>
-
-      {/* Status bar */}
-      <StatusBar />
-    </div>
-  );
+export interface EntityTemplate {
+  name: string;
+  label: string;
+  icon?: string;
+  components: ComponentTemplate[];
 }

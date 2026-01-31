@@ -1,8 +1,8 @@
 # Emergence Engine
 
-A web-based 2D game engine for simulation games. Code-first, browser-native, minimal by design.
+A browser-native 2D game engine with an integrated visual editor for simulation games.
 
-**This is a standalone engine.** Clone it, extend it, build your own games. We're building [Colony](docs/plans/mvp/design.md#target-game-colony) (a RimWorld-like) to prove it works.
+**This is a standalone engine.** Clone it, extend it, build your own games. The editor runs entirely in the browser—no downloads required. We're building [Colony](docs/plans/mvp/design.md#target-game-colony) (a RimWorld-like) to prove it works.
 
 ![Emergence Engine Demo](docs/screenshot.png)
 
@@ -227,8 +227,9 @@ engine.renderer.drawTextScreen(text, x, y, { font, color, align });
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | TypeScript check + production build |
+| `npm run dev` | Start Colony dev server |
+| `npm run dev:editor` | Start Editor dev server |
+| `npm run build` | Build all packages |
 | `npm test` | Run tests |
 | `npm run test:watch` | Tests in watch mode |
 | `npm run test:coverage` | Tests with coverage report |
@@ -245,8 +246,15 @@ packages/
 │       ├── render/         # Canvas 2D primitives + Camera
 │       ├── world/          # TileMap, terrain generation
 │       ├── ai/             # A* pathfinding, utility AI
+│       ├── serialization/  # Save/load game state
 │       ├── Engine.ts       # Unified entry point
 │       └── index.ts        # Public exports
+│
+├── editor/                 # Browser-native visual editor (React + Vite)
+│   └── src/
+│       ├── components/     # UI components (Toolbar, Viewport, etc.)
+│       ├── hooks/          # React hooks (useEditorContext)
+│       └── main.tsx        # Entry point
 │
 └── colony/                 # Colony game (uses engine API)
     └── src/
@@ -261,6 +269,9 @@ packages/
 - [x] Phase 4: A Pawn Lives — Click-to-move, pathfinding, hunger
 - [x] Phase 5: Pawn Thinks — Utility AI, actions, autonomous behavior
 - [x] Phase 6: Two Colonies — Factions, regions, caravan trade
+- [x] Phase 7: Persistence & Editor Shell — Save/load, React editor UI
+- [x] Phase 8: Tile Painting — Paint terrain/buildings with brush tools
+- [x] Phase 9: Entity Placement — Place entities from templates, component inspector
 
 ## License
 

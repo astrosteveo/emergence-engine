@@ -15,7 +15,7 @@ Monorepo containing:
 
 ## Current Status
 
-Phases 1-7 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry), Serialization (save/load). Colony game demonstrates multi-colony caravan system. Editor package provides browser-native visual editing with Edit/Play mode toggle.
+Phases 1-9 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry), Serialization (save/load). Colony game demonstrates multi-colony caravan system. Editor provides browser-native visual editing with tile painting (terrain/buildings), entity placement from templates, and component inspector.
 
 ## Quick Start
 
@@ -119,7 +119,14 @@ packages/
 
 - **Pan**: WASD or arrow keys
 - **Zoom**: Mouse scroll wheel (discrete levels: 1x, 2x, 4x)
-- **Play/Stop**: Button in toolbar (or toggles simulation)
+- **Play/Stop**: Button in toolbar (toggles simulation)
+- **Paint mode**: P key
+- **Erase mode**: X key
+- **Entity mode**: E key
+- **Brush size**: 1, 2, 3 keys (1x1, 3x3, 5x5)
+- **Undo/Redo**: Ctrl+Z / Ctrl+Shift+Z (tile painting only)
+- **Delete entity**: Delete or Backspace (when entity selected)
+- **Deselect**: Escape
 
 ## Public API
 

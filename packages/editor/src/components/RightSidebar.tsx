@@ -16,34 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Toolbar } from './Toolbar';
-import { Sidebar } from './Sidebar';
-import { Viewport } from './Viewport';
-import { RightSidebar } from './RightSidebar';
-import { StatusBar } from './StatusBar';
+import { EntityList } from './EntityList';
+import { Inspector } from './Inspector';
 
-export function EditorShell() {
+export function RightSidebar() {
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Toolbar */}
-      <Toolbar />
-
-      {/* Main content area */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar */}
-        <Sidebar />
-
-        {/* Viewport */}
-        <div className="flex-1 min-w-0">
-          <Viewport />
-        </div>
-
-        {/* Right Sidebar */}
-        <RightSidebar />
-      </div>
-
-      {/* Status bar */}
-      <StatusBar />
+    <div className="w-64 bg-editor-surface border-l border-editor-border flex flex-col overflow-y-auto">
+      <EntityList />
+      <Inspector />
     </div>
   );
 }
