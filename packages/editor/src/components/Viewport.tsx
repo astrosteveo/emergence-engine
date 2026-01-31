@@ -150,7 +150,7 @@ export function Viewport() {
         const pos = newEngine.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
         if (!pos) continue;
 
-        const screenPos = camera.worldToScreen(pos.x, pos.y);
+        const screenPos = camera.worldToScreen(pos.x * TILE_SIZE, pos.y * TILE_SIZE);
         const size = TILE_SIZE * camera.zoom;
 
         // Simple entity rendering
