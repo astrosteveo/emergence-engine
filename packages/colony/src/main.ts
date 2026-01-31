@@ -17,7 +17,9 @@
  */
 
 import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
-import type { Entity, PathNode } from 'emergence-engine';
+import type { Entity, PathNode, ActionContext } from 'emergence-engine';
+
+let debugMode = true; // On by default in dev
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const engine = new Engine({ canvas, tickRate: 20 });
@@ -42,7 +44,37 @@ engine.ecs.defineComponent('Pawn', {}); // Marker for the controllable pawn
 engine.ecs.defineComponent('PathTarget', { x: 0, y: 0 }); // Target tile
 engine.ecs.defineComponent('PathFollow', { path: [] as PathNode[], nodeIndex: 0 });
 engine.ecs.defineComponent('Hunger', { current: 0, max: 100, rate: 2 }); // rate = per second
-engine.ecs.defineComponent('DestinationMarker', {}); // Marker for destination indicator
+engine.ecs.defineComponent('Food', { nutrition: 30 });
+engine.ecs.defineComponent('CurrentTask', { action: '', target: null as Entity | null });
+engine.ecs.defineComponent('AIState', { lastHungerPercent: 0, needsReeval: true });
+
+function spawnFood(count: number): void {
+  const halfW = Math.floor(engine.tileMap.width / 2);
+  const halfH = Math.floor(engine.tileMap.height / 2);
+  let spawned = 0;
+  let attempts = 0;
+  const maxAttempts = count * 10;
+
+  while (spawned < count && attempts < maxAttempts) {
+    attempts++;
+    const tileX = Math.floor(Math.random() * engine.tileMap.width) - halfW;
+    const tileY = Math.floor(Math.random() * engine.tileMap.height) - halfH;
+
+    if (engine.tileMap.isWalkable(tileX, tileY)) {
+      const food = engine.ecs.createEntity();
+      engine.ecs.addComponent(food, 'Position', {
+        x: tileX * TILE_SIZE + TILE_SIZE / 2,
+        y: tileY * TILE_SIZE + TILE_SIZE / 2,
+      });
+      engine.ecs.addComponent(food, 'Food', { nutrition: 30 });
+      engine.ecs.addComponent(food, 'Sprite', { width: 12, height: 12, color: '#4ade80' });
+      spawned++;
+    }
+  }
+}
+
+// Spawn food items
+spawnFood(20);
 
 // Create pawn entity at world center
 const pawn = engine.ecs.createEntity();
@@ -50,9 +82,116 @@ engine.ecs.addComponent(pawn, 'Position', { x: 0, y: 0 });
 engine.ecs.addComponent(pawn, 'Sprite');
 engine.ecs.addComponent(pawn, 'Pawn');
 engine.ecs.addComponent(pawn, 'Hunger', { current: 25, max: 100, rate: 2 });
+engine.ecs.addComponent(pawn, 'AIState', { lastHungerPercent: 0.25, needsReeval: true });
 
-// Destination marker (hidden until path is set)
-let destinationMarker: Entity | null = null;
+// Used by AIDecisionSystem (Task 12)
+export function createActionContext(): ActionContext {
+  return {
+    ecs: {
+      query: (c) => engine.ecs.query(c),
+      getComponent: (e, n) => engine.ecs.getComponent(e, n),
+      hasComponent: (e, n) => engine.ecs.hasComponent(e, n),
+      addComponent: (e, n, d) => engine.ecs.addComponent(e, n, d),
+      removeComponent: (e, n) => engine.ecs.removeComponent(e, n),
+      isAlive: (e) => engine.ecs.isAlive(e),
+    },
+    findNearest: (e, c) => engine.findNearest(e, c),
+  };
+}
+
+engine.ai.defineAction('eat', {
+  canExecute(entity, context) {
+    return context.findNearest(entity, 'Food') !== null;
+  },
+  score(entity, context) {
+    const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
+    if (!hunger) return 0;
+    return hunger.current / hunger.max;
+  },
+  execute(entity, context) {
+    const food = context.findNearest(entity, 'Food');
+    if (!food) return;
+
+    const foodPos = context.ecs.getComponent<{ x: number; y: number }>(food, 'Position');
+    if (!foodPos) return;
+
+    const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!entityPos) return;
+
+    const tileX = Math.floor(foodPos.x / TILE_SIZE);
+    const tileY = Math.floor(foodPos.y / TILE_SIZE);
+    const entityTileX = Math.floor(entityPos.x / TILE_SIZE);
+    const entityTileY = Math.floor(entityPos.y / TILE_SIZE);
+
+    // Check if path exists before committing to task
+    const path = pathfinder.findPath(entityTileX, entityTileY, tileX, tileY);
+    if (!path) return; // Food is unreachable, don't set task
+
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+
+    context.ecs.addComponent(entity, 'PathTarget', { x: tileX, y: tileY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'eat', target: food });
+  },
+});
+
+engine.ai.defineAction('wander', {
+  canExecute() {
+    return true;
+  },
+  score() {
+    return 0.1;
+  },
+  execute(entity, context) {
+    const pos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!pos) return;
+
+    const currentTileX = Math.floor(pos.x / TILE_SIZE);
+    const currentTileY = Math.floor(pos.y / TILE_SIZE);
+
+    const range = 5;
+    let targetX = currentTileX;
+    let targetY = currentTileY;
+    let found = false;
+
+    for (let attempts = 0; attempts < 10 && !found; attempts++) {
+      const dx = Math.floor(Math.random() * (range * 2 + 1)) - range;
+      const dy = Math.floor(Math.random() * (range * 2 + 1)) - range;
+      const tx = currentTileX + dx;
+      const ty = currentTileY + dy;
+
+      if (engine.tileMap.isWalkable(tx, ty)) {
+        targetX = tx;
+        targetY = ty;
+        found = true;
+      }
+    }
+
+    if (!found) return;
+
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+
+    context.ecs.addComponent(entity, 'PathTarget', { x: targetX, y: targetY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'wander', target: null });
+  },
+});
 
 // Camera control system
 engine.ecs.addSystem({
@@ -67,31 +206,53 @@ engine.ecs.addSystem({
     if (input.isKeyPressed('Minus') || input.isKeyPressed('NumpadSubtract')) {
       camera.zoomOut();
     }
+    if (input.isKeyPressed('Backquote')) {
+      debugMode = !debugMode;
+    }
   },
 });
 
-// Click-to-move system: on left click, set PathTarget on pawn
+// AI Decision system: re-evaluate when needed
 engine.ecs.addSystem({
-  name: 'ClickToMove',
-  query: ['Pawn', 'Position'],
+  name: 'AIDecision',
+  query: ['Pawn', 'Hunger', 'AIState'],
   update(entities) {
-    if (!engine.input.isMousePressed('left')) return;
-
-    const tile = engine.camera.screenToTile(engine.input.mouseX, engine.input.mouseY, TILE_SIZE);
-
-    // Only set target if tile is walkable
-    if (!engine.tileMap.isWalkable(tile.x, tile.y)) return;
+    const context = createActionContext();
 
     for (const e of entities) {
-      // Remove any existing path
-      if (engine.ecs.hasComponent(e, 'PathFollow')) {
-        engine.ecs.removeComponent(e, 'PathFollow');
+      const aiState = engine.ecs.getComponent<{ lastHungerPercent: number; needsReeval: boolean }>(e, 'AIState')!;
+      const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger')!;
+      const currentPercent = hunger.current / hunger.max;
+
+      if (aiState.lastHungerPercent < 0.5 && currentPercent >= 0.5) {
+        aiState.needsReeval = true;
       }
-      // Set new target
-      if (engine.ecs.hasComponent(e, 'PathTarget')) {
-        engine.ecs.removeComponent(e, 'PathTarget');
+      aiState.lastHungerPercent = currentPercent;
+
+      const hasTask = engine.ecs.hasComponent(e, 'CurrentTask');
+      const hasPath = engine.ecs.hasComponent(e, 'PathFollow') || engine.ecs.hasComponent(e, 'PathTarget');
+      if (hasTask && !hasPath) {
+        aiState.needsReeval = true;
       }
-      engine.ecs.addComponent(e, 'PathTarget', { x: tile.x, y: tile.y });
+
+      if (!hasTask) {
+        aiState.needsReeval = true;
+      }
+
+      if (hasTask) {
+        const task = engine.ecs.getComponent<{ action: string; target: Entity | null }>(e, 'CurrentTask')!;
+        if (task.target !== null && !engine.ecs.isAlive(task.target)) {
+          aiState.needsReeval = true;
+        }
+      }
+
+      if (aiState.needsReeval) {
+        aiState.needsReeval = false;
+        const actionName = engine.ai.pickBest(e, context);
+        if (actionName) {
+          engine.ai.execute(actionName, e, context);
+        }
+      }
     }
   },
 });
@@ -107,27 +268,12 @@ engine.ecs.addSystem({
       const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
       const target = engine.ecs.getComponent<{ x: number; y: number }>(e, 'PathTarget')!;
 
-      // Convert current position to tile
       const currentTile = engine.camera.worldToTile(pos.x, pos.y, TILE_SIZE);
-
       const path = pathfinder.findPath(currentTile.x, currentTile.y, target.x, target.y);
 
       if (path && path.length > 1) {
-        // Skip first node (current position)
         engine.ecs.addComponent(e, 'PathFollow', { path: path.slice(1), nodeIndex: 0 });
-
-        // Create destination marker
-        if (destinationMarker !== null) {
-          engine.ecs.destroyEntity(destinationMarker);
-        }
-        destinationMarker = engine.ecs.createEntity();
-        engine.ecs.addComponent(destinationMarker, 'Position', {
-          x: target.x * TILE_SIZE + TILE_SIZE / 2,
-          y: target.y * TILE_SIZE + TILE_SIZE / 2,
-        });
-        engine.ecs.addComponent(destinationMarker, 'DestinationMarker');
       } else {
-        // No valid path, remove target
         engine.ecs.removeComponent(e, 'PathTarget');
       }
     }
@@ -152,11 +298,6 @@ engine.ecs.addSystem({
         if (engine.ecs.hasComponent(e, 'PathTarget')) {
           engine.ecs.removeComponent(e, 'PathTarget');
         }
-        // Remove destination marker
-        if (destinationMarker !== null) {
-          engine.ecs.destroyEntity(destinationMarker);
-          destinationMarker = null;
-        }
         continue;
       }
 
@@ -179,6 +320,36 @@ engine.ecs.addSystem({
         const ratio = Math.min(moveDistance / distance, 1);
         pos.x += dx * ratio;
         pos.y += dy * ratio;
+      }
+    }
+  },
+});
+
+// Task execution system: handle task completion when arrived
+engine.ecs.addSystem({
+  name: 'TaskExecution',
+  query: ['CurrentTask', 'Position'],
+  update(entities) {
+    for (const e of entities) {
+      if (engine.ecs.hasComponent(e, 'PathFollow') || engine.ecs.hasComponent(e, 'PathTarget')) {
+        continue;
+      }
+
+      const task = engine.ecs.getComponent<{ action: string; target: Entity | null }>(e, 'CurrentTask')!;
+
+      if (task.action === 'eat' && task.target !== null) {
+        if (engine.ecs.isAlive(task.target)) {
+          const food = engine.ecs.getComponent<{ nutrition: number }>(task.target, 'Food');
+          const hunger = engine.ecs.getComponent<{ current: number; max: number }>(e, 'Hunger');
+
+          if (food && hunger) {
+            hunger.current = Math.max(0, hunger.current - food.nutrition);
+            engine.ecs.destroyEntity(task.target);
+          }
+        }
+        engine.ecs.removeComponent(e, 'CurrentTask');
+      } else if (task.action === 'wander') {
+        engine.ecs.removeComponent(e, 'CurrentTask');
       }
     }
   },
@@ -218,13 +389,6 @@ engine.onDraw(() => {
   // Draw tile map
   engine.renderer.drawTileMap(engine.tileMap, TILE_SIZE);
 
-  // Draw destination marker
-  for (const e of engine.ecs.query(['DestinationMarker', 'Position'])) {
-    const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
-    // Draw a small X
-    engine.renderer.drawCircle(pos.x, pos.y, 4, '#ffdd57');
-  }
-
   // Draw entities (pawns)
   for (const e of engine.ecs.query(['Position', 'Sprite'])) {
     const pos = engine.ecs.getComponent<{ x: number; y: number }>(e, 'Position')!;
@@ -237,10 +401,13 @@ engine.onDraw(() => {
 
   // UI: Stats panel (screen-space, bottom-left)
   const hunger = engine.ecs.getComponent<{ current: number; max: number }>(pawn, 'Hunger')!;
+  const currentTask = engine.ecs.getComponent<{ action: string; target: Entity | null }>(pawn, 'CurrentTask');
+  const taskLabel = currentTask ? currentTask.action.charAt(0).toUpperCase() + currentTask.action.slice(1) : 'Idle';
+
   const panelX = 10;
-  const panelY = canvas.height - 90;
+  const panelY = canvas.height - 110;
   const panelWidth = 160;
-  const panelHeight = 80;
+  const panelHeight = 100;
 
   // Panel background
   engine.renderer.drawRectScreen(panelX, panelY, panelWidth, panelHeight, 'rgba(26, 26, 46, 0.9)');
@@ -251,15 +418,21 @@ engine.onDraw(() => {
     color: '#ffffff',
   });
 
+  // Task label
+  engine.renderer.drawTextScreen(`Task: ${taskLabel}`, panelX + 10, panelY + 42, {
+    font: '12px monospace',
+    color: '#aaaaaa',
+  });
+
   // Hunger label
-  engine.renderer.drawTextScreen('Hunger', panelX + 10, panelY + 45, {
+  engine.renderer.drawTextScreen('Hunger', panelX + 10, panelY + 62, {
     font: '12px monospace',
     color: '#aaaaaa',
   });
 
   // Hunger bar background
   const barX = panelX + 10;
-  const barY = panelY + 52;
+  const barY = panelY + 69;
   const barWidth = 120;
   const barHeight = 14;
   engine.renderer.drawRectScreen(barX, barY, barWidth, barHeight, '#333333');
@@ -277,9 +450,43 @@ engine.onDraw(() => {
     { font: '11px monospace', color: '#888888' }
   );
 
+  // Debug overlay (` toggle)
+  if (debugMode) {
+    const context = createActionContext();
+    const scores = engine.ai.evaluateAll(pawn, context);
+    const currentTask = engine.ecs.getComponent<{ action: string }>(pawn, 'CurrentTask');
+
+    const debugX = 10;
+    const debugY = canvas.height - 220;
+    const debugWidth = 160;
+    const debugHeight = 100;
+
+    engine.renderer.drawRectScreen(debugX, debugY, debugWidth, debugHeight, 'rgba(26, 26, 46, 0.9)');
+    engine.renderer.drawTextScreen('AI Debug (`)', debugX + 10, debugY + 22, {
+      font: '14px monospace',
+      color: '#ffffff',
+    });
+
+    let yOffset = 42;
+    for (const { action, score, canExecute } of scores) {
+      const isActive = currentTask?.action === action;
+      const color = !canExecute ? '#666666' : isActive ? '#4ade80' : '#aaaaaa';
+      const marker = isActive ? ' ◄' : '';
+      const scoreText = canExecute ? score.toFixed(2) : '-.--';
+
+      engine.renderer.drawTextScreen(
+        `${action}: ${scoreText}${marker}`,
+        debugX + 10,
+        debugY + yOffset,
+        { font: '12px monospace', color }
+      );
+      yOffset += 18;
+    }
+  }
+
   // Instructions (top-left)
-  engine.renderer.drawTextScreen('Click to move | +/-: Zoom', 10, 30, { color: '#888' });
+  engine.renderer.drawTextScreen('Autonomous mode | +/-: Zoom | `: Debug', 10, 30, { color: '#888' });
 });
 
 engine.start();
-console.log('Colony - Built with Emergence Engine (Phase 4: A Pawn Lives)');
+console.log('Colony - Built with Emergence Engine (Phase 5: Pawn Thinks)');

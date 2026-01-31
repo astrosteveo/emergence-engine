@@ -31,3 +31,5 @@ export { generateTerrain } from './world/generate';
 export type { GeneratorConfig } from './world/generate';
 export { Pathfinder } from './ai/Pathfinder';
 export type { PathNode, WalkabilityFn, PathfinderOptions } from './ai/Pathfinder';
+export { ActionRegistry } from './ai/ActionRegistry';
+export type { ActionDefinition, ActionContext, ActionScore } from './ai/ActionRegistry';

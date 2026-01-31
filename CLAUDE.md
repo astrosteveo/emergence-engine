@@ -14,7 +14,7 @@ Monorepo containing:
 
 ## Current Status
 
-Phases 1-4 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding.
+Phases 1-5 complete. Engine provides: GameLoop, ECS, Input (keyboard + mouse), Camera, TileMap, Terrain Generation, Renderer, A* Pathfinding, Utility AI (ActionRegistry).
 
 ## Commands
 
@@ -48,7 +48,7 @@ packages/
 │   │   ├── input/          # Keyboard + mouse polling
 │   │   ├── render/         # Canvas 2D primitives + Camera
 │   │   ├── world/          # TileMap, terrain generation, noise
-│   │   ├── ai/             # A* pathfinding
+│   │   ├── ai/             # A* pathfinding, Utility AI
 │   │   ├── Engine.ts       # Unified entry point
 │   │   └── index.ts        # Public exports
 │   └── package.json
@@ -82,14 +82,17 @@ packages/
 - Camera uses discrete zoom levels (1x, 2x, 4x) - use `zoomIn()`/`zoomOut()` not arbitrary values
 - TileMap uses center-origin coordinates - (0,0) is map center, not top-left
 - Mouse coordinates are canvas-relative (Input takes canvas element for offset calculation)
+- Component order matters - define components before any code that uses them (including spawn functions)
+- Browser captures certain keys (F1-F12) - use backtick or letter keys for game hotkeys
+- AI actions should verify path reachability in execute() before committing to a task
 
 ## Public API
 
 All public exports are in `packages/engine/src/index.ts`. Colony (and external consumers) import from `'emergence-engine'`:
 
 ```typescript
-import { Engine, generateTerrain, Pathfinder } from 'emergence-engine';
-import type { Entity, System, EngineConfig, PathNode } from 'emergence-engine';
+import { Engine, generateTerrain, Pathfinder, ActionRegistry } from 'emergence-engine';
+import type { Entity, System, EngineConfig, PathNode, ActionDefinition, ActionContext } from 'emergence-engine';
 ```
 
 Key exports:
@@ -98,7 +101,8 @@ Key exports:
 - `Pathfinder` - A* pathfinding with walkability callback
 - `World`, `Entity`, `System` - ECS primitives (also accessible via `engine.ecs`)
 - `Camera`, `Renderer`, `TileMap` - Subsystems (also accessible via engine instance)
-- `MouseButton`, `PathNode` - Type exports
+- `ActionRegistry` - Utility AI framework for autonomous entities (also accessible via `engine.ai`)
+- `MouseButton`, `PathNode`, `ActionDefinition`, `ActionContext` - Type exports
 
 ## Git Workflow
 
