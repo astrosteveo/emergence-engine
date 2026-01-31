@@ -389,6 +389,131 @@ function findHomeStockpile(pawnEntity: Entity): Entity | null {
   return null;
 }
 
+function findStockpileByFaction(factionId: string): Entity | null {
+  for (const s of engine.ecs.query(['Stockpile', 'Position'])) {
+    const stockpile = engine.ecs.getComponent<{ factionId: string }>(s, 'Stockpile')!;
+    if (stockpile.factionId === factionId) {
+      return s;
+    }
+  }
+  return null;
+}
+
+engine.ai.defineAction('caravan', {
+  canExecute(entity, context) {
+    // Already on a caravan?
+    if (context.ecs.hasComponent(entity, 'CaravanTask')) return false;
+
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return false;
+
+    // Own stockpile has surplus?
+    const homeStockpile = findHomeStockpile(entity);
+    if (!homeStockpile) return false;
+
+    const stockpileComp = context.ecs.getComponent<{ food: number }>(homeStockpile, 'Stockpile');
+    if (!stockpileComp || stockpileComp.food <= SURPLUS_THRESHOLD) return false;
+
+    // Know of a colony in deficit?
+    const memory = context.ecs.getComponent<{
+      known: Array<{ factionId: string; lastSeenFood: number; ticksSinceVisit: number }>;
+    }>(entity, 'ColonyMemory');
+    if (!memory) return false;
+
+    const needyColony = memory.known.find(
+      (k) => k.lastSeenFood < DEFICIT_THRESHOLD && k.ticksSinceVisit < MEMORY_DECAY_TICKS
+    );
+    return needyColony !== undefined;
+  },
+  score(entity, context) {
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return 0;
+
+    const homeStockpile = findHomeStockpile(entity);
+    if (!homeStockpile) return 0;
+
+    const stockpileComp = context.ecs.getComponent<{ food: number }>(homeStockpile, 'Stockpile');
+    if (!stockpileComp) return 0;
+
+    const memory = context.ecs.getComponent<{
+      known: Array<{ factionId: string; lastSeenFood: number; ticksSinceVisit: number }>;
+    }>(entity, 'ColonyMemory');
+    if (!memory) return 0;
+
+    const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
+    if (!hunger) return 0;
+
+    // Find the neediest known colony
+    const needyColony = memory.known.find(
+      (k) => k.lastSeenFood < DEFICIT_THRESHOLD && k.ticksSinceVisit < MEMORY_DECAY_TICKS
+    );
+    if (!needyColony) return 0;
+
+    // Calculate score
+    const surplusFactor = (stockpileComp.food - SURPLUS_THRESHOLD) / stockpileComp.food;
+    const deficitFactor = 1 - needyColony.lastSeenFood / DEFICIT_THRESHOLD;
+    const hungerPercent = hunger.current / hunger.max;
+    const hungerPenalty = 1 - hungerPercent * 0.8;
+
+    return surplusFactor * deficitFactor * hungerPenalty * 0.7;
+  },
+  execute(entity, context) {
+    const faction = context.ecs.getComponent<{ id: string }>(entity, 'Faction');
+    if (!faction) return;
+
+    const memory = context.ecs.getComponent<{
+      known: Array<{ factionId: string; stockpileX: number; stockpileY: number; lastSeenFood: number }>;
+    }>(entity, 'ColonyMemory');
+    if (!memory) return;
+
+    const needyColony = memory.known.find((k) => k.lastSeenFood < DEFICIT_THRESHOLD);
+    if (!needyColony) return;
+
+    const targetStockpile = findStockpileByFaction(needyColony.factionId);
+    if (!targetStockpile) return;
+
+    const homeStockpile = findHomeStockpile(entity);
+    if (!homeStockpile) return;
+
+    const homePos = context.ecs.getComponent<{ x: number; y: number }>(homeStockpile, 'Position');
+    if (!homePos) return;
+
+    const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!entityPos) return;
+
+    const homeTileX = Math.floor(homePos.x / TILE_SIZE);
+    const homeTileY = Math.floor(homePos.y / TILE_SIZE);
+    const entityTileX = Math.floor(entityPos.x / TILE_SIZE);
+    const entityTileY = Math.floor(entityPos.y / TILE_SIZE);
+
+    // Verify path to home stockpile exists
+    const path = pathfinder.findPath(entityTileX, entityTileY, homeTileX, homeTileY);
+    if (!path) return;
+
+    // Set up caravan task
+    context.ecs.addComponent(entity, 'CaravanTask', {
+      targetFactionId: needyColony.factionId,
+      targetStockpile,
+      phase: 'pickup',
+      homeStockpile,
+    });
+
+    // Clear existing path and set path to home stockpile
+    if (context.ecs.hasComponent(entity, 'PathFollow')) {
+      context.ecs.removeComponent(entity, 'PathFollow');
+    }
+    if (context.ecs.hasComponent(entity, 'PathTarget')) {
+      context.ecs.removeComponent(entity, 'PathTarget');
+    }
+    context.ecs.addComponent(entity, 'PathTarget', { x: homeTileX, y: homeTileY });
+
+    if (context.ecs.hasComponent(entity, 'CurrentTask')) {
+      context.ecs.removeComponent(entity, 'CurrentTask');
+    }
+    context.ecs.addComponent(entity, 'CurrentTask', { action: 'caravan', target: homeStockpile });
+  },
+});
+
 // Camera control system
 engine.ecs.addSystem({
   name: 'CameraControl',
