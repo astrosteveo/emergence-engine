@@ -45,6 +45,7 @@ export function Viewport() {
     selectedTemplate,
     selectedEntityId,
     selectEntity,
+    deleteSelectedEntity,
   } = useEditor();
 
   // Painting state
@@ -484,6 +485,15 @@ export function Viewport() {
         return;
       }
 
+      // Delete selected entity
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedEntityId !== null) {
+          e.preventDefault();
+          deleteSelectedEntity();
+          return;
+        }
+      }
+
       // Camera panning
       switch (e.key) {
         case 'ArrowUp':
@@ -511,7 +521,7 @@ export function Viewport() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [engine, setProject, undoActions, tool, setTool, setBrushSize, selectEntity]);
+  }, [engine, setProject, undoActions, tool, setTool, setBrushSize, selectEntity, deleteSelectedEntity, selectedEntityId]);
 
   // Trigger draw frame for edit mode
   useEffect(() => {
