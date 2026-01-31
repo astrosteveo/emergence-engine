@@ -197,7 +197,7 @@ engine.ecs.addSystem({
     if (input.isKeyPressed('Minus') || input.isKeyPressed('NumpadSubtract')) {
       camera.zoomOut();
     }
-    if (input.isKeyPressed('F3')) {
+    if (input.isKeyPressed('Backquote')) {
       debugMode = !debugMode;
     }
   },
@@ -441,7 +441,7 @@ engine.onDraw(() => {
     { font: '11px monospace', color: '#888888' }
   );
 
-  // Debug overlay (F3 toggle)
+  // Debug overlay (` toggle)
   if (debugMode) {
     const context = createActionContext();
     const scores = engine.ai.evaluateAll(pawn, context);
@@ -453,7 +453,7 @@ engine.onDraw(() => {
     const debugHeight = 100;
 
     engine.renderer.drawRectScreen(debugX, debugY, debugWidth, debugHeight, 'rgba(26, 26, 46, 0.9)');
-    engine.renderer.drawTextScreen('AI Debug (F3)', debugX + 10, debugY + 22, {
+    engine.renderer.drawTextScreen('AI Debug (`)', debugX + 10, debugY + 22, {
       font: '14px monospace',
       color: '#ffffff',
     });
@@ -476,7 +476,7 @@ engine.onDraw(() => {
   }
 
   // Instructions (top-left)
-  engine.renderer.drawTextScreen('Autonomous mode | +/-: Zoom | F3: Debug', 10, 30, { color: '#888' });
+  engine.renderer.drawTextScreen('Autonomous mode | +/-: Zoom | `: Debug', 10, 30, { color: '#888' });
 });
 
 engine.start();
