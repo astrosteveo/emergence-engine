@@ -16,16 +16,38 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { Engine } from 'emergence-engine';
 import { useEditor } from '../hooks/useEditorContext';
+import { getBrushTiles } from '../utils/brush';
+import type { TileChange } from '../hooks/useUndo';
 
 const TILE_SIZE = 16;
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { engine, setEngine, mode, setMouseWorldPos, setProject } = useEditor();
+  const {
+    engine,
+    setEngine,
+    mode,
+    setMouseWorldPos,
+    setProject,
+    tool,
+    setTool,
+    brushSize,
+    setBrushSize,
+    brushShape,
+    selectedTerrain,
+    selectedBuilding,
+    undoActions,
+  } = useEditor();
+
+  // Painting state
+  const isPaintingRef = useRef(false);
+  const strokeChangesRef = useRef<TileChange[]>([]);
+  const paintedTilesRef = useRef<Set<string>>(new Set());
+  const [hoverTile, setHoverTile] = useState<{ x: number; y: number } | null>(null);
 
   // Initialize engine
   useEffect(() => {
@@ -136,8 +158,123 @@ export function Viewport() {
     return () => resizeObserver.disconnect();
   }, [engine]);
 
-  // Handle mouse movement for status bar
-  const handleMouseMove = useCallback(
+  // Capture current tile state for undo
+  const captureTileState = useCallback(
+    (x: number, y: number) => {
+      if (!engine) return { terrainName: null, buildingName: null };
+      const terrain = engine.tileMap.getTerrain(x, y);
+      const building = engine.tileMap.getBuilding(x, y);
+      return {
+        terrainName: terrain?.name ?? null,
+        buildingName: building?.name ?? null,
+      };
+    },
+    [engine]
+  );
+
+  // Paint a single tile (terrain or building)
+  const paintTile = useCallback(
+    (tileX: number, tileY: number) => {
+      if (!engine || mode !== 'edit') return;
+      if (!engine.tileMap.isInBounds(tileX, tileY)) return;
+
+      const tileKey = `${tileX},${tileY}`;
+      if (paintedTilesRef.current.has(tileKey)) return;
+      paintedTilesRef.current.add(tileKey);
+
+      const before = captureTileState(tileX, tileY);
+
+      if (tool === 'erase') {
+        // Erase: remove building first, then revert terrain to grass
+        const building = engine.tileMap.getBuilding(tileX, tileY);
+        if (building) {
+          engine.tileMap.clearBuilding(tileX, tileY);
+        } else {
+          engine.tileMap.setTerrain(tileX, tileY, 'grass');
+        }
+      } else if (selectedBuilding) {
+        engine.tileMap.setBuilding(tileX, tileY, selectedBuilding);
+      } else if (selectedTerrain) {
+        engine.tileMap.setTerrain(tileX, tileY, selectedTerrain);
+      }
+
+      const after = captureTileState(tileX, tileY);
+
+      // Only record if something changed
+      if (before.terrainName !== after.terrainName || before.buildingName !== after.buildingName) {
+        strokeChangesRef.current.push({ x: tileX, y: tileY, before, after });
+      }
+    },
+    [engine, mode, tool, selectedTerrain, selectedBuilding, captureTileState]
+  );
+
+  // Paint all tiles under the brush
+  const paintBrush = useCallback(
+    (centerX: number, centerY: number) => {
+      const tiles = getBrushTiles(centerX, centerY, brushSize, brushShape);
+      for (const tile of tiles) {
+        paintTile(tile.x, tile.y);
+      }
+    },
+    [brushSize, brushShape, paintTile]
+  );
+
+  // Commit the current stroke to undo stack
+  const commitStroke = useCallback(() => {
+    if (strokeChangesRef.current.length > 0) {
+      undoActions.pushEntry({ type: 'paint', changes: [...strokeChangesRef.current] });
+      setProject({ modified: true });
+    }
+    strokeChangesRef.current = [];
+    paintedTilesRef.current.clear();
+  }, [undoActions, setProject]);
+
+  // Mouse down: start painting
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!engine || mode !== 'edit') return;
+      if (e.button !== 0 && e.button !== 2) return; // Only left or right click
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      const worldPos = engine.camera.screenToWorld(screenX, screenY);
+      const tilePos = engine.camera.worldToTile(worldPos.x, worldPos.y, TILE_SIZE);
+
+      isPaintingRef.current = true;
+      strokeChangesRef.current = [];
+      paintedTilesRef.current.clear();
+
+      // Right-click forces erase mode for this stroke
+      if (e.button === 2) {
+        const tiles = getBrushTiles(tilePos.x, tilePos.y, brushSize, brushShape);
+        for (const tile of tiles) {
+          if (!engine.tileMap.isInBounds(tile.x, tile.y)) continue;
+          const tileKey = `${tile.x},${tile.y}`;
+          paintedTilesRef.current.add(tileKey);
+
+          const before = captureTileState(tile.x, tile.y);
+          const building = engine.tileMap.getBuilding(tile.x, tile.y);
+          if (building) {
+            engine.tileMap.clearBuilding(tile.x, tile.y);
+          } else {
+            engine.tileMap.setTerrain(tile.x, tile.y, 'grass');
+          }
+          const after = captureTileState(tile.x, tile.y);
+
+          if (before.terrainName !== after.terrainName || before.buildingName !== after.buildingName) {
+            strokeChangesRef.current.push({ x: tile.x, y: tile.y, before, after });
+          }
+        }
+      } else {
+        paintBrush(tilePos.x, tilePos.y);
+      }
+    },
+    [engine, mode, brushSize, brushShape, captureTileState, paintBrush]
+  );
+
+  // Mouse move: continue painting if dragging
+  const handleMouseMovePaint = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!engine) return;
 
@@ -145,15 +282,64 @@ export function Viewport() {
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       const worldPos = engine.camera.screenToWorld(screenX, screenY);
+      const tilePos = engine.camera.worldToTile(worldPos.x, worldPos.y, TILE_SIZE);
 
+      setHoverTile(tilePos);
       setMouseWorldPos(worldPos);
+
+      if (isPaintingRef.current && mode === 'edit') {
+        // Check if right button is held (for erase)
+        if (e.buttons === 2) {
+          const tiles = getBrushTiles(tilePos.x, tilePos.y, brushSize, brushShape);
+          for (const tile of tiles) {
+            if (!engine.tileMap.isInBounds(tile.x, tile.y)) continue;
+            const tileKey = `${tile.x},${tile.y}`;
+            if (paintedTilesRef.current.has(tileKey)) continue;
+            paintedTilesRef.current.add(tileKey);
+
+            const before = captureTileState(tile.x, tile.y);
+            const building = engine.tileMap.getBuilding(tile.x, tile.y);
+            if (building) {
+              engine.tileMap.clearBuilding(tile.x, tile.y);
+            } else {
+              engine.tileMap.setTerrain(tile.x, tile.y, 'grass');
+            }
+            const after = captureTileState(tile.x, tile.y);
+
+            if (before.terrainName !== after.terrainName || before.buildingName !== after.buildingName) {
+              strokeChangesRef.current.push({ x: tile.x, y: tile.y, before, after });
+            }
+          }
+        } else {
+          paintBrush(tilePos.x, tilePos.y);
+        }
+      }
     },
-    [engine, setMouseWorldPos]
+    [engine, mode, brushSize, brushShape, captureTileState, paintBrush, setMouseWorldPos]
   );
 
-  const handleMouseLeave = useCallback(() => {
+  // Mouse up: commit stroke
+  const handleMouseUp = useCallback(() => {
+    if (isPaintingRef.current) {
+      isPaintingRef.current = false;
+      commitStroke();
+    }
+  }, [commitStroke]);
+
+  // Mouse leave: commit stroke and clear hover
+  const handleMouseLeavePaint = useCallback(() => {
     setMouseWorldPos(null);
-  }, [setMouseWorldPos]);
+    setHoverTile(null);
+    if (isPaintingRef.current) {
+      isPaintingRef.current = false;
+      commitStroke();
+    }
+  }, [setMouseWorldPos, commitStroke]);
+
+  // Prevent context menu on right-click
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+  }, []);
 
   // Handle camera controls
   const handleWheel = useCallback(
@@ -172,12 +358,53 @@ export function Viewport() {
     [engine, setProject]
   );
 
-  // Handle keyboard controls for camera panning
+  // Handle keyboard controls for camera panning and shortcuts
   useEffect(() => {
     if (!engine) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle shortcuts if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
       const panSpeed = 16;
+
+      // Undo/Redo
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undoActions.undo(engine);
+          return;
+        }
+        if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+          e.preventDefault();
+          undoActions.redo(engine);
+          return;
+        }
+      }
+
+      // Brush size shortcuts
+      if (e.key === '1') {
+        setBrushSize(1);
+        return;
+      }
+      if (e.key === '2') {
+        setBrushSize(3);
+        return;
+      }
+      if (e.key === '3') {
+        setBrushSize(5);
+        return;
+      }
+
+      // Toggle eraser
+      if (e.key === 'e' || e.key === 'E') {
+        setTool(tool === 'erase' ? 'paint' : 'erase');
+        return;
+      }
+
+      // Camera panning
       switch (e.key) {
         case 'ArrowUp':
         case 'w':
@@ -204,7 +431,7 @@ export function Viewport() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [engine, setProject]);
+  }, [engine, setProject, undoActions, tool, setTool, setBrushSize]);
 
   // Trigger draw frame for edit mode
   useEffect(() => {
@@ -213,9 +440,27 @@ export function Viewport() {
     let animationId: number;
     const drawFrame = () => {
       // In edit mode, we still need to render even though the game loop is stopped
-      // The engine's onDraw callbacks are executed by the game loop, so we need
-      // to manually trigger a render frame
       engine.loop.drawOnce?.();
+
+      // Draw brush preview on top
+      if (hoverTile) {
+        const camera = engine.camera;
+        const tileMap = engine.tileMap;
+        const renderer = engine.renderer;
+
+        const previewTiles = getBrushTiles(hoverTile.x, hoverTile.y, brushSize, brushShape);
+        const previewColor = tool === 'erase' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(79, 70, 229, 0.5)';
+
+        for (const tile of previewTiles) {
+          if (!tileMap.isInBounds(tile.x, tile.y)) continue;
+
+          const screenPos = camera.worldToScreen(tile.x * TILE_SIZE, tile.y * TILE_SIZE);
+          const size = TILE_SIZE * camera.zoom;
+
+          renderer.drawRectScreen(screenPos.x, screenPos.y, size, size, previewColor);
+        }
+      }
+
       animationId = requestAnimationFrame(drawFrame);
     };
 
@@ -224,16 +469,19 @@ export function Viewport() {
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [engine, mode]);
+  }, [engine, mode, hoverTile, brushSize, brushShape, tool]);
 
   return (
     <div ref={containerRef} className="w-full h-full bg-editor-bg overflow-hidden">
       <canvas
         ref={canvasRef}
         className="block"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMovePaint}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeavePaint}
         onWheel={handleWheel}
+        onContextMenu={handleContextMenu}
       />
     </div>
   );

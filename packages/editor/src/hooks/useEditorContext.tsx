@@ -25,6 +25,10 @@ import {
 } from 'react';
 import type { Engine } from 'emergence-engine';
 import type { EmergenceSaveFile } from 'emergence-engine';
+import { useUndo, type UndoState, type UndoActions } from './useUndo';
+import type { BrushSize, BrushShape } from '../utils/brush';
+
+export type EditorTool = 'paint' | 'erase';
 
 export type EditorMode = 'edit' | 'play';
 
@@ -45,6 +49,20 @@ interface EditorContextValue {
   setMouseWorldPos: (pos: { x: number; y: number } | null) => void;
   currentSave: EmergenceSaveFile | null;
   setCurrentSave: (save: EmergenceSaveFile | null) => void;
+  // Painting state (Phase 8)
+  tool: EditorTool;
+  setTool: (tool: EditorTool) => void;
+  brushSize: BrushSize;
+  setBrushSize: (size: BrushSize) => void;
+  brushShape: BrushShape;
+  setBrushShape: (shape: BrushShape) => void;
+  selectedTerrain: string | null;
+  setSelectedTerrain: (name: string | null) => void;
+  selectedBuilding: string | null;
+  setSelectedBuilding: (name: string | null) => void;
+  // Undo system
+  undoState: UndoState;
+  undoActions: UndoActions;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -59,6 +77,31 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   });
   const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
   const [currentSave, setCurrentSave] = useState<EmergenceSaveFile | null>(null);
+
+  // Painting state
+  const [tool, setTool] = useState<EditorTool>('paint');
+  const [brushSize, setBrushSize] = useState<BrushSize>(1);
+  const [brushShape, setBrushShape] = useState<BrushShape>('square');
+  const [selectedTerrain, setSelectedTerrainState] = useState<string | null>('grass');
+  const [selectedBuilding, setSelectedBuildingState] = useState<string | null>(null);
+
+  // Undo system
+  const [undoState, undoActions] = useUndo();
+
+  // Selection handlers - terrain and building are mutually exclusive
+  const setSelectedTerrain = useCallback((name: string | null) => {
+    setSelectedTerrainState(name);
+    if (name) {
+      setSelectedBuildingState(null);
+    }
+  }, []);
+
+  const setSelectedBuilding = useCallback((name: string | null) => {
+    setSelectedBuildingState(name);
+    if (name) {
+      setSelectedTerrainState(null);
+    }
+  }, []);
 
   const setMode = useCallback(
     (newMode: EditorMode) => {
@@ -91,6 +134,18 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         setMouseWorldPos,
         currentSave,
         setCurrentSave,
+        tool,
+        setTool,
+        brushSize,
+        setBrushSize,
+        brushShape,
+        setBrushShape,
+        selectedTerrain,
+        setSelectedTerrain,
+        selectedBuilding,
+        setSelectedBuilding,
+        undoState,
+        undoActions,
       }}
     >
       {children}
