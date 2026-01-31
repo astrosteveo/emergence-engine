@@ -115,8 +115,17 @@ engine.ai.defineAction('eat', {
     const foodPos = context.ecs.getComponent<{ x: number; y: number }>(food, 'Position');
     if (!foodPos) return;
 
+    const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
+    if (!entityPos) return;
+
     const tileX = Math.floor(foodPos.x / TILE_SIZE);
     const tileY = Math.floor(foodPos.y / TILE_SIZE);
+    const entityTileX = Math.floor(entityPos.x / TILE_SIZE);
+    const entityTileY = Math.floor(entityPos.y / TILE_SIZE);
+
+    // Check if path exists before committing to task
+    const path = pathfinder.findPath(entityTileX, entityTileY, tileX, tileY);
+    if (!path) return; // Food is unreachable, don't set task
 
     if (context.ecs.hasComponent(entity, 'PathFollow')) {
       context.ecs.removeComponent(entity, 'PathFollow');
