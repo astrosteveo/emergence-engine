@@ -169,7 +169,10 @@ engine.ai.defineAction('eat', {
   score(entity, context) {
     const hunger = context.ecs.getComponent<{ current: number; max: number }>(entity, 'Hunger');
     if (!hunger) return 0;
-    return hunger.current / hunger.max;
+    const percent = hunger.current / hunger.max;
+    // Only prioritize eating when moderately hungry (above 40%)
+    if (percent < 0.4) return 0;
+    return percent;
   },
   execute(entity, context) {
     const entityPos = context.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
