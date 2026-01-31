@@ -194,6 +194,8 @@ export function Viewport() {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
+        // Skip if dimensions are invalid (can happen during layout transitions)
+        if (width <= 0 || height <= 0) continue;
         canvas.width = width;
         canvas.height = height;
         // Update renderer/camera with new dimensions
@@ -285,8 +287,13 @@ export function Viewport() {
       const entities = engine.ecs.getAllEntities();
       for (const entity of entities) {
         const pos = engine.ecs.getComponent<{ x: number; y: number }>(entity, 'Position');
-        if (pos && pos.x === tileX && pos.y === tileY) {
-          return entity;
+        // Check if entity's world position falls within this tile
+        if (pos) {
+          const entityTileX = Math.floor(pos.x / TILE_SIZE);
+          const entityTileY = Math.floor(pos.y / TILE_SIZE);
+          if (entityTileX === tileX && entityTileY === tileY) {
+            return entity;
+          }
         }
       }
       return null;
@@ -306,10 +313,10 @@ export function Viewport() {
       const entity = engine.ecs.createEntity();
       for (const comp of template.components) {
         const data = { ...comp.defaults };
-        // Override position with click location
+        // Override position with click location (convert to world coordinates)
         if (comp.type === 'Position') {
-          data.x = tileX;
-          data.y = tileY;
+          data.x = tileX * TILE_SIZE;
+          data.y = tileY * TILE_SIZE;
         }
         try {
           engine.ecs.addComponent(entity, comp.type, data);
@@ -585,7 +592,10 @@ export function Viewport() {
       if (selectedEntityId !== null && engine.ecs.isAlive(selectedEntityId)) {
         const pos = engine.ecs.getComponent<{ x: number; y: number }>(selectedEntityId, 'Position');
         if (pos) {
-          const screenPos = camera.worldToScreen(pos.x * TILE_SIZE, pos.y * TILE_SIZE);
+          // Position stores world coordinates, convert to tile for alignment
+          const tileX = Math.floor(pos.x / TILE_SIZE);
+          const tileY = Math.floor(pos.y / TILE_SIZE);
+          const screenPos = camera.worldToScreen(tileX * TILE_SIZE, tileY * TILE_SIZE);
           const size = TILE_SIZE * camera.zoom;
           renderer.strokeRectScreen(screenPos.x, screenPos.y, size, size, '#fbbf24');
         }
