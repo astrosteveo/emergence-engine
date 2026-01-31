@@ -37,8 +37,8 @@ The first open-source, browser-native game engine with an integrated editor. Eve
 |---------|--------|-------|
 | Phase 7: Persistence & Shell | ✅ Done | Serialization API, React editor, save/load |
 | Tile painting | ✅ Done | Paint terrain, place buildings |
-| Entity placement | 🔲 Planned | Spawn pawns, items, structures (Phase 9) |
-| Component inspector | 🔲 Planned | View/edit entity components (Phase 9) |
+| Entity placement | ✅ Done | Spawn entities from templates |
+| Component inspector | ✅ Done | View/edit entity components |
 | Play-in-editor | 🔲 Planned | Test without leaving browser (Phase 10) |
 
 ### Milestone 3: Distribution & Polish
